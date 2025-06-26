@@ -1,6 +1,6 @@
 "use client"
 import Image from "next/image";
-import Link from "next/link";
+
 import StockDashboard from "./(components)/stockdash1";
 
 export default function Home() {
