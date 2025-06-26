@@ -1,5 +1,9 @@
-// types/stock.ts
-export interface CurrentPrice {
+"use client"
+// components/StockDashboard.tsx
+import React, { useState, useEffect } from 'react';
+
+// Types defined inline to avoid import issues
+interface CurrentPrice {
   price: number;
   change: number;
   change_percent: number;
@@ -7,7 +11,7 @@ export interface CurrentPrice {
   avg_volume: number;
 }
 
-export interface TechnicalIndicators {
+interface TechnicalIndicators {
   EMA_10: number;
   EMA_20: number;
   SMA_50: number;
@@ -24,14 +28,14 @@ export interface TechnicalIndicators {
   CCI: number;
 }
 
-export interface Indicators {
+interface Indicators {
   symbol: string;
   timestamp: string;
   current_price: CurrentPrice;
   indicators: TechnicalIndicators;
 }
 
-export interface SpreadOption {
+interface SpreadOption {
   type: string;
   short_strike: number;
   long_strike: number;
@@ -41,7 +45,7 @@ export interface SpreadOption {
   breakeven: string;
 }
 
-export interface SpreadSuggestion {
+interface SpreadSuggestion {
   timeframe: string;
   expiration_date: string;
   expected_move: number;
@@ -50,7 +54,7 @@ export interface SpreadSuggestion {
   technical_justification: string[];
 }
 
-export interface Spreads {
+interface Spreads {
   market_bias: string;
   bias_strength: number;
   support_levels: number[];
@@ -60,7 +64,7 @@ export interface Spreads {
   expected_moves: number;
 }
 
-export interface StockData {
+interface StockData {
   symbol: string;
   indicators: Indicators;
   spreads: Spreads;
@@ -68,24 +72,20 @@ export interface StockData {
   is_updating: boolean;
 }
 
-export interface ApiResponse {
+interface ApiResponse {
   success: boolean;
   data: StockData;
   message: string | null;
   timestamp: string;
 }
 
-// components/StockDashboard.tsx
-import React, { useState, useEffect } from 'react';
-import { ApiResponse } from '../types/stock';
-
 const StockDashboard: React.FC = () => {
   const [data, setData] = useState<ApiResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (): Promise<void> => {
       try {
         const response = await fetch('http://localhost:8000/api/dashboard/QUBT');
         if (!response.ok) {
@@ -93,17 +93,28 @@ const StockDashboard: React.FC = () => {
         }
         const result: ApiResponse = await response.json();
         setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        setError(null);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError('An unknown error occurred');
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchData().catch((err: unknown) => {
+      console.error('Failed to fetch data:', err);
+    });
     
     // Optional: Set up polling for real-time updates
-    const interval = setInterval(fetchData, 30000); // Update every 30 seconds
+    const interval = setInterval(() => {
+      fetchData().catch((err: unknown) => {
+        console.error('Failed to fetch data:', err);
+      });
+    }, 30000); // Update every 30 seconds
     
     return () => clearInterval(interval);
   }, []);
@@ -139,8 +150,8 @@ const StockDashboard: React.FC = () => {
   const { indicators, spreads } = data.data;
   const { current_price, indicators: tech } = indicators;
 
-  const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
-  const formatPercent = (value: number) => `${value.toFixed(2)}%`;
+  const formatCurrency = (value: number): string => `${value.toFixed(2)}`;
+  const formatPercent = (value: number): string => `${value.toFixed(2)}%`;
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
