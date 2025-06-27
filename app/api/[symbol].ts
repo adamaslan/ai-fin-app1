@@ -16,6 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       timestamp: new Date().toISOString()
     });
   } catch (e) {
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+  console.error('Database error:', e);
+  res.status(500).json({ success: false, message: 'Server error' });
+}
 }
