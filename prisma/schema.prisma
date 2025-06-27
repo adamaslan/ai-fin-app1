@@ -1,0 +1,70 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model stock_data {
+  symbol                 String  @id
+  indicators_symbol      String  
+  indicators_timestamp   DateTime
+  price                  Float
+  change                 Float
+  change_percent         Float
+  volume                 BigInt
+  avg_volume             BigInt
+  ema_10                 Float
+  ema_20                 Float
+  sma_50                 Float
+  rsi                    Float
+  macd                   Float
+  macd_signal            Float
+  macd_histogram         Float
+  bb_upper               Float
+  bb_middle              Float
+  bb_lower               Float
+  stoch_k                Float
+  stoch_d                Float
+  williams_r             Float
+  cci                    Float
+  market_bias            String
+  bias_strength          Float
+  support_levels         Float[]
+  resistance_levels      Float[]
+  overall_recommendation String
+  expected_moves         Float
+  last_updated           DateTime
+  is_updating            Boolean
+  
+  // Add this relation
+  spread_suggestions     spread_suggestions[]
+}
+
+model spread_suggestions {
+  id                         Int      @id @default(autoincrement())
+  stock_symbol               String
+  timeframe                  String
+  expiration_date            DateTime @db.Date
+  expected_move              Float
+  call_type                  String
+  call_short_strike          Float
+  call_long_strike           Float
+  call_width                 Float
+  call_max_profit            String
+  call_max_loss              String
+  call_breakeven             String
+  put_type                   String
+  put_short_strike           Float
+  put_long_strike            Float
+  put_width                  Float
+  put_max_profit             String
+  put_max_loss               String
+  put_breakeven              String
+  technical_justification    String[]
+  
+  // Relation to stock_data
+  stock_data                 stock_data @relation(fields: [stock_symbol], references: [symbol], onDelete: Cascade)
+}

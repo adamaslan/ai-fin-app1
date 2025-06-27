@@ -84,10 +84,11 @@ const StockDashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+
   useEffect(() => {
     const fetchData = async (): Promise<void> => {
       try {
-        const response = await fetch('http://localhost:8000/api/dashboard/QUBT');
+        const response = await fetch('/api/dashboard/QUBT');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -118,6 +119,20 @@ const StockDashboard: React.FC = () => {
     
     return () => clearInterval(interval);
   }, []);
+
+  const formatCurrency = (value: number): string => `${value.toFixed(2)}`;
+  const formatPercent = (value: number): string => `${value.toFixed(2)}%`;
+
+  // Simple date formatting using the timestamp data you already have
+  const formatDate = (timestamp: string): string => timestamp;
+  
+  const formatExpirationDate = (dateString: string): string => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US');
+    } catch {
+      return dateString; // Return original if parsing fails
+    }
+  };
 
   if (loading) {
     return (
@@ -150,9 +165,6 @@ const StockDashboard: React.FC = () => {
   const { indicators, spreads } = data.data;
   const { current_price, indicators: tech } = indicators;
 
-  const formatCurrency = (value: number): string => `${value.toFixed(2)}`;
-  const formatPercent = (value: number): string => `${value.toFixed(2)}%`;
-
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Header */}
@@ -161,7 +173,7 @@ const StockDashboard: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{indicators.symbol}</h1>
             <p className="text-sm text-gray-500">
-              Last updated: {new Date(data.data.last_updated).toLocaleString()}
+              Last updated: {formatDate(indicators.timestamp)}
             </p>
           </div>
           {data.data.is_updating && (
@@ -327,7 +339,7 @@ const StockDashboard: React.FC = () => {
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-semibold text-lg">{suggestion.timeframe}</h3>
                 <span className="text-sm text-gray-500">
-                  Expires: {new Date(suggestion.expiration_date).toLocaleDateString()}
+                  Expires: {formatExpirationDate(suggestion.expiration_date)}
                 </span>
               </div>
               
