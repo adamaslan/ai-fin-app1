@@ -16,6 +16,7 @@ interface SpreadSuggestion {
   put_breakeven: string;
   technical_justification: string[];
   expiration_date: Date;
+  
 }
 
 export default async function SpreadSuggestionsPage() {
