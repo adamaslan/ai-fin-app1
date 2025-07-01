@@ -1,144 +1,78 @@
-// app/spread-suggestions/page.tsx
-'use client';
+import prisma from "../lib/prisma"; // Direct server-side import
+import { format } from 'date-fns'; // For date formatting
 
-import { useEffect, useState } from 'react';
+// Define the type for a SpreadSuggestion, matching your Prisma schema
+interface SpreadSuggestion {
+  id: number;
+  stock_symbol: string;
+  timeframe: string;
+  call_type: string;
+  call_max_profit: string;
+  call_max_loss: string;
+  call_breakeven: string;
+  put_type: string;
+  put_max_profit: string;
+  put_max_loss: string;
+  put_breakeven: string;
+  technical_justification: string[];
+  expiration_date: Date;
+}
 
-export default function SpreadSuggestionsPage() {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        console.log('Fetching data...');
-        const res = await fetch('/api/spread-suggestions');
-        console.log('Response status:', res.status);
-        
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        
-        const result = await res.json();
-        console.log('Data received:', result);
-        setData(result);
-      } catch (err) {
-        console.error('Fetch error:', err);
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchData();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-lg text-red-600 mb-4">Error: {error}</div>
-          <div className="text-sm">Check the browser console for more details</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-lg">No data received</div>
-      </div>
-    );
-  }
+export default async function SpreadSuggestionsPage() {
+  // Data fetching logic
+  const suggestions = await prisma.spread_suggestions.findMany({
+    orderBy: { expiration_date: 'desc' },
+  });
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h1 className="text-2xl font-bold mb-6">Options Spread Suggestions</h1>
-          
-          {/* Debug: Show raw data */}
-       
-       
+    <main className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6">Latest Spread Suggestions</h1>
 
-          {/* Basic Info */}
-          <div className="mb-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-sm text-gray-600">Symbol</div>
-                <div className="font-semibold">{(data as any)?.stock_symbol || 'N/A'}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Timeframe</div>
-                <div className="font-semibold">{data.timeframe || 'N/A'}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Expiration</div>
-                <div className="font-semibold">{data.expiration_date || 'N/A'}</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-600">Expected Move</div>
-                <div className="font-semibold">
-                  {data.expected_move ? `${(data.expected_move * 100).toFixed(1)}%` : 'N/A'}
-                </div>
-              </div>
-            </div>
-          </div>
+      {suggestions.length === 0 ? (
+        <p>No spread suggestions found.</p>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          {suggestions.map((sugg: SpreadSuggestion) => (
+            <article key={sugg.id} className="border rounded-2xl p-4 shadow">
+              <header className="mb-4">
+                <h2 className="text-xl font-semibold">{sugg.stock_symbol} - {sugg.timeframe}</h2>
+                <p className="text-sm text-gray-500">
+                  Expires: {format(sugg.expiration_date, 'MMMM dd, yyyy')}
+                </p>
+              </header>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Call Spread */}
-            <div className="border border-green-200 rounded-lg p-4">
-              <h2 className="text-lg font-bold text-green-800 mb-4">
-                Call Spread - {data.call_type || 'N/A'}
-              </h2>
-              <div className="space-y-2">
-                <div>Short Strike: ${data.call_short_strike || 'N/A'}</div>
-                <div>Long Strike: ${data.call_long_strike || 'N/A'}</div>
-                <div>Width: ${data.call_width || 'N/A'}</div>
-                <div>Breakeven: {data.call_breakeven || 'N/A'}</div>
-                <div>Max Profit: {data.call_max_profit || 'N/A'}</div>
-                <div>Max Loss: {data.call_max_loss || 'N/A'}</div>
-              </div>
-            </div>
+              <section className="mb-4">
+                <h3 className="font-medium">Call Leg</h3>
+                <ul className="list-disc list-inside">
+                  <li>Type: {sugg.call_type}</li>
+                  <li>Max Profit: {sugg.call_max_profit}</li>
+                  <li>Max Loss: {sugg.call_max_loss}</li>
+                  <li>Breakeven: {sugg.call_breakeven}</li>
+                </ul>
+              </section>
 
-            {/* Put Spread */}
-            <div className="border border-red-200 rounded-lg p-4">
-              <h2 className="text-lg font-bold text-red-800 mb-4">
-                Put Spread - {data.put_type || 'N/A'}
-              </h2>
-              <div className="space-y-2">
-                <div>Short Strike: ${data.put_short_strike || 'N/A'}</div>
-                <div>Long Strike: ${data.put_long_strike || 'N/A'}</div>
-                <div>Width: ${data.put_width || 'N/A'}</div>
-                <div>Breakeven: {data.put_breakeven || 'N/A'}</div>
-                <div>Max Profit: {data.put_max_profit || 'N/A'}</div>
-                <div>Max Loss: {data.put_max_loss || 'N/A'}</div>
-              </div>
-            </div>
-          </div>
+              <section className="mb-4">
+                <h3 className="font-medium">Put Leg</h3>
+                <ul className="list-disc list-inside">
+                  <li>Type: {sugg.put_type}</li>
+                  <li>Max Profit: {sugg.put_max_profit}</li>
+                  <li>Max Loss: {sugg.put_max_loss}</li>
+                  <li>Breakeven: {sugg.put_breakeven}</li>
+                </ul>
+              </section>
 
-          {/* Technical Justification */}
-          {data.technical_justification && (
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-bold text-blue-800 mb-3">Technical Analysis</h3>
-              <div className="space-y-1">
-                {Object.entries(data.technical_justification).map(([key, value]) => (
-                  <div key={key}>• {value}</div>
-                ))}
-              </div>
-            </div>
-          )}
+              <section>
+                <h3 className="font-medium">Technical Justification</h3>
+                <ul className="list-decimal list-inside">
+                  {sugg.technical_justification.map((point, idx) => (
+                    <li key={idx}>{point}</li>
+                  ))}
+                </ul>
+              </section>
+            </article>
+          ))}
         </div>
-      </div>
-    </div>
+      )}
+    </main>
   );
 }
