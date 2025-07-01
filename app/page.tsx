@@ -1,7 +1,6 @@
 "use client"
 import Image from "next/image";
-
-// import QubtComponent from "./(components)/stock4";
+import SpreadSuggestionsServer from "./(components)/Spread1";
 
 export default function Home() {
   return (
@@ -76,8 +75,8 @@ export default function Home() {
           </div>
           
           {/* Dashboard container with subtle styling */}
-          <div className="bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden">
-     {/* <QubtComponent /> */}
+          <div className="bg-white/5 text-white/60 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden">
+  <SpreadSuggestionsServer />
           </div>
         </div>
       </div>
