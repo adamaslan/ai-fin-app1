@@ -1,7 +1,7 @@
-import prisma from "../lib/prisma"; // Direct server-side import
-import { format } from 'date-fns'; // For date formatting
+// components/SpreadSuggestionsServer.tsx
+import prisma from '../lib/prisma';
+import { format } from 'date-fns';
 
-// Define the type for a SpreadSuggestion, matching your Prisma schema
 interface SpreadSuggestion {
   id: number;
   stock_symbol: string;
@@ -17,38 +17,34 @@ interface SpreadSuggestion {
   technical_justification: string[];
   expiration_date: Date;
   expected_move: number;
-  // price?: number;            // ← newly added
+  // price?: number;
 }
 
-export default async function SpreadSuggestionsPage() {
-  // Data fetching logic (no select, we pull in all fields)
-  const suggestions = await prisma.spread_suggestions.findMany({
+export default async function SpreadSuggestionsServer() {
+  const suggestions: SpreadSuggestion[] = await prisma.spread_suggestions.findMany({
     orderBy: { expiration_date: 'desc' },
   });
 
   return (
-    <main className="container mx-auto p-4">
+    <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-6">Latest Spread Suggestions</h1>
 
       {suggestions.length === 0 ? (
         <p>No spread suggestions found.</p>
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
-          {suggestions.map((sugg: SpreadSuggestion) => (
+          {suggestions.map((sugg) => (
             <article key={sugg.id} className="border rounded-2xl p-4 shadow">
               <header className="mb-4">
                 <h2 className="text-xl font-semibold">
                   {sugg.stock_symbol} — {sugg.timeframe}
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Expires: {format(sugg.expiration_date, 'MMMM dd, yyyy')}
+                  Expires: {format(new Date(sugg.expiration_date), 'MMMM dd, yyyy')}
                 </p>
-                     <p className="text-lg font-medium">
-+                  Expected Move: {sugg.expected_move?.toFixed(2)}
-+                </p>
-                {/* <p className="text-lg font-medium mt-2">
-                  Price: ${sugg.price.toFixed(2)}
-                </p> */}
+                <p className="text-lg font-medium">
+                  Expected Move: {sugg.expected_move.toFixed(2)}
+                </p>
               </header>
 
               <section className="mb-4">
@@ -83,6 +79,6 @@ export default async function SpreadSuggestionsPage() {
           ))}
         </div>
       )}
-    </main>
+    </div>
   );
 }
