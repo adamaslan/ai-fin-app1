@@ -16,11 +16,12 @@ interface SpreadSuggestion {
   put_breakeven: string;
   technical_justification: string[];
   expiration_date: Date;
-  
+  expected_move: number;
+  price?: number;            // ← newly added
 }
 
 export default async function SpreadSuggestionsPage() {
-  // Data fetching logic
+  // Data fetching logic (no select, we pull in all fields)
   const suggestions = await prisma.spread_suggestions.findMany({
     orderBy: { expiration_date: 'desc' },
   });
@@ -36,10 +37,18 @@ export default async function SpreadSuggestionsPage() {
           {suggestions.map((sugg: SpreadSuggestion) => (
             <article key={sugg.id} className="border rounded-2xl p-4 shadow">
               <header className="mb-4">
-                <h2 className="text-xl font-semibold">{sugg.stock_symbol} - {sugg.timeframe}</h2>
+                <h2 className="text-xl font-semibold">
+                  {sugg.stock_symbol} — {sugg.timeframe}
+                </h2>
                 <p className="text-sm text-gray-500">
                   Expires: {format(sugg.expiration_date, 'MMMM dd, yyyy')}
                 </p>
+                     <p className="text-lg font-medium">
++                  Expected Move: {sugg.expected_move?.toFixed(2)}
++                </p>
+                {/* <p className="text-lg font-medium mt-2">
+                  Price: ${sugg.price.toFixed(2)}
+                </p> */}
               </header>
 
               <section className="mb-4">
