@@ -1,7 +1,7 @@
 "use client"
 import Image from "next/image";
 
-import QubtComponent from "./(components)/stock4";
+// import QubtComponent from "./(components)/stock4";
 
 export default function Home() {
   return (
@@ -77,7 +77,7 @@ export default function Home() {
           
           {/* Dashboard container with subtle styling */}
           <div className="bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden">
-     <QubtComponent />
+     {/* <QubtComponent /> */}
           </div>
         </div>
       </div>
