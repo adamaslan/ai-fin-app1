@@ -14,8 +14,8 @@ model stock_data {
   price                  Float
   change                 Float
   change_percent         Float
-  volume                 BigInt
-  avg_volume             BigInt
+  volume          Float
+  avg_volume      Float
   ema_10                 Float
   ema_20                 Float
   sma_50                 Float
