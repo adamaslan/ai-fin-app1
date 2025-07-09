@@ -10,14 +10,19 @@ interface SpreadSuggestion {
   call_max_profit: string;
   call_max_loss: string;
   call_breakeven: string;
+  call_short_strike: number; // Update type to number
+  call_long_strike: number; // Update type to number
+  call_width: number; // Update type to number
+  expiration_date: Date;
+  expected_move: number;
   put_type: string;
   put_max_profit: string;
   put_max_loss: string;
   put_breakeven: string;
+  put_short_strike: number; // Update type to number           
+  put_long_strike: number;                           
+  put_width: number; // Update type to number                  
   technical_justification: string[];
-  expiration_date: Date;
-  expected_move: number;
-  // price?: number;
 }
 
 export default async function SpreadSuggestionsServer() {
@@ -54,6 +59,9 @@ export default async function SpreadSuggestionsServer() {
                   <li>Max Profit: {sugg.call_max_profit}</li>
                   <li>Max Loss: {sugg.call_max_loss}</li>
                   <li>Breakeven: {sugg.call_breakeven}</li>
+                  <li>Short Strike: {sugg.call_short_strike}</li>
+                  <li>Long Strike: {sugg.call_long_strike}</li>
+                  <li>Width: {sugg.call_width}</li>
                 </ul>
               </section>
 
@@ -64,6 +72,9 @@ export default async function SpreadSuggestionsServer() {
                   <li>Max Profit: {sugg.put_max_profit}</li>
                   <li>Max Loss: {sugg.put_max_loss}</li>
                   <li>Breakeven: {sugg.put_breakeven}</li>
+                  <li>Short Strike: {sugg.put_short_strike}</li>
+                  <li>Long Strike: {sugg.put_long_strike}</li>
+                  <li>Width: {sugg.put_width}</li>
                 </ul>
               </section>
 
