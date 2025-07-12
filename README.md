@@ -1,3 +1,5 @@
 Adam is a researcher and AI engineer exploring computer vision applications at Drinks Food Life, with a strong foundation in 3D graphics and interactive media. Leveraging extensive experience with Blender, ThreeJS, and React Three Fiber, Adam is an expert in building and manipulating complex 3D objects in both animation and web environments.
+
 In recent work, Adam has developed Python-based pipelines for generating 3D point clouds from text prompts. The original method involves creating a 2D image via Stable Diffusion, estimating depth maps with AI models, and sampling both to construct colored point clouds. These point clouds map RGB and depth data into 3D space and are saved in PLY format to represent richly detailed 3D models.
+
 Adam also created an optimized version of this pipeline, focusing on performance and computational efficiency. This variant generates monochromatic point clouds using vectorized NumPy operations and a larger sampling stride. While the results are sparser and less visually detailed, they are significantly faster to compute and less demanding on system resources—highlighting Adam’s ability to tailor tools for varied project needs.
