@@ -46,25 +46,6 @@ export default function Home() {
             <span className="px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm">⚡ Real-time Updates</span>
           </div>
 
-          {/* CTA Button */}
-          <div className="pt-4">
-            <button 
-              onClick={() => document.getElementById('dashboard')?.scrollIntoView({ behavior: 'smooth' })}
-              className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-300 ease-out transform hover:scale-105"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur group-hover:blur-md transition duration-300"></div>
-              <div className="relative bg-gradient-to-r from-purple-600 to-pink-600 rounded-full px-8 py-4 border border-white/20 group-hover:border-white/40 transition duration-300">
-                <span className="flex items-center gap-3">
-                  View Dashboard
-                  <svg className="w-5 h-5 group-hover:translate-y-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
-                </span>
-              </div>
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* Dashboard Component Section */}
       <div id="dashboard" className="relative z-10 min-h-screen bg-gradient-to-b from-transparent to-slate-900/50">
@@ -75,17 +56,20 @@ export default function Home() {
           </div>
           
           {/* Dashboard container with subtle styling */}
+
+ <style jsx>{`
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+      `}
+
           <div className="bg-white/5 text-white/60 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden">
   <SpreadSuggestionsServer />
           </div>
         </div>
       </div>
 
-      <style jsx>{`
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-      `}</style>
+     </style>
     </div>
   );
 }
