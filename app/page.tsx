@@ -56,18 +56,9 @@ export default function Home() {
           </div>
           
           {/* Dashboard container with subtle styling */}
-<style jsx>{`
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  .animate-fade-in {
-    animation: fadeIn 1s ease-in 2s forwards;
-    opacity: 0;
-  }
-`}</style>
-<div className="animate-fade-in bg-white/5 text-white/60 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden">
-  <SpreadSuggestionsServer /> will this animate the component?
+
+<div className="opacity-0 animate-fade-in-up bg-white/5 text-white/60 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:border-green-500/30">
+  <SpreadSuggestionsServer />
 </div>
 
         </div>
