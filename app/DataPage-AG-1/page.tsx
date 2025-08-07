@@ -1,5 +1,3 @@
-'use client';
-
 import { useMemo, useEffect, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ICellRendererParams, ModuleRegistry } from 'ag-grid-community';
@@ -7,11 +5,12 @@ import { AllCommunityModule } from 'ag-grid-community';
 import { format } from 'date-fns';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+import prisma from "../lib/prisma";
 
 // Register AG Grid modules
 ModuleRegistry.registerModules([AllCommunityModule]);
 
-// Define the type for a SpreadSuggestion, matching your Prisma schema
+// Define the type for a SpreadSuggestion with related stock data
 interface SpreadSuggestion {
   id: number;
   stock_symbol: string;
@@ -25,9 +24,12 @@ interface SpreadSuggestion {
   put_max_loss: string;
   put_breakeven: string;
   technical_justification: string[];
-  expiration_date: string; // Now serialized as string from server
+  expiration_date: string;
   expected_move: number;
-  // price?: number;            // ← newly added
+  stock_data?: {
+    price: number;
+    // Add other stock_data fields as needed
+  } | null;
 }
 
 // Custom cell renderer for Call Leg details
@@ -80,15 +82,20 @@ const TechnicalJustificationRenderer = (params: ICellRendererParams) => {
   );
 };
 
-// Custom cell renderer for Stock Symbol and Timeframe
+// Custom cell renderer for Stock Symbol, Timeframe, and Current Price
 const SymbolTimeframeRenderer = (params: ICellRendererParams) => {
-  const { stock_symbol, timeframe } = params.data;
+  const { stock_symbol, timeframe, stock_data } = params.data;
   
   return (
     <div className="py-2">
       <div className="text-xl font-semibold">
         {stock_symbol} — {timeframe}
       </div>
+      {stock_data?.price && (
+        <div className="text-sm text-gray-600 mt-1">
+          Current: ${stock_data.price.toFixed(2)}
+        </div>
+      )}
     </div>
   );
 };
@@ -119,25 +126,64 @@ const ExpectedMoveRenderer = (params: ICellRendererParams) => {
   );
 };
 
-interface SpreadSuggestionsGridProps {
-  suggestions: SpreadSuggestion[];
+// Server action to fetch spread suggestions using Prisma
+async function fetchSpreadSuggestions(): Promise<SpreadSuggestion[]> {
+  try {
+    // Data fetching logic with stock data relation
+    const suggestions = await prisma.spread_suggestions.findMany({
+      include: {
+        stock_data: true, // Include the related stock data
+      },
+      orderBy: { expiration_date: 'desc' },
+    });
+
+    // Transform the data to ensure proper serialization
+    const serializedSuggestions: SpreadSuggestion[] = suggestions.map(suggestion => ({
+      ...suggestion,
+      expiration_date: suggestion.expiration_date.toISOString(),
+      technical_justification: Array.isArray(suggestion.technical_justification) 
+        ? suggestion.technical_justification 
+        : [],
+    }));
+
+    return serializedSuggestions;
+  } catch (error) {
+    console.error('Error fetching spread suggestions:', error);
+    return [];
+  }
 }
 
-export default function SpreadSuggestionsGrid({ suggestions }: SpreadSuggestionsGridProps) {
+export default function SpreadSuggestionsPage() {
   const [rowData, setRowData] = useState<SpreadSuggestion[]>([]);
-
-  console.log('Grid received suggestions:', suggestions); // Debug log
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Sort suggestions by expiration date (desc) to match original behavior
-    if (suggestions && Array.isArray(suggestions)) {
-      const sortedSuggestions = [...suggestions].sort((a, b) => 
-        new Date(b.expiration_date).getTime() - new Date(a.expiration_date).getTime()
-      );
-      console.log('Sorted suggestions:', sortedSuggestions); // Debug log
-      setRowData(sortedSuggestions);
-    }
-  }, [suggestions]);
+    const loadSuggestions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const suggestions = await fetchSpreadSuggestions();
+        
+        console.log('Fetched suggestions:', suggestions);
+        
+        // Sort by expiration date (desc) to match original behavior
+        const sortedSuggestions = [...suggestions].sort((a, b) => 
+          new Date(b.expiration_date).getTime() - new Date(a.expiration_date).getTime()
+        );
+        
+        console.log('Sorted suggestions:', sortedSuggestions);
+        setRowData(sortedSuggestions);
+      } catch (err) {
+        console.error('Error loading suggestions:', err);
+        setError('Failed to load spread suggestions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSuggestions();
+  }, []);
 
   const columnDefs: ColDef[] = useMemo(() => [
     {
@@ -155,7 +201,7 @@ export default function SpreadSuggestionsGrid({ suggestions }: SpreadSuggestions
       cellRenderer: ExpirationRenderer,
       width: 200,
       sortable: true,
-      sort: 'desc', // Default sort
+      sort: 'desc',
     },
     {
       headerName: 'Expected Move',
@@ -185,61 +231,87 @@ export default function SpreadSuggestionsGrid({ suggestions }: SpreadSuggestions
       cellRenderer: TechnicalJustificationRenderer,
       width: 400,
       sortable: false,
-      flex: 1, // Takes remaining space
+      flex: 1,
     },
   ], []);
 
   const defaultColDef = useMemo(() => ({
     resizable: true,
     filter: true,
-    autoHeight: true, // Allows rows to expand based on content
+    autoHeight: true,
   }), []);
 
-  return (
-    <div className="ag-theme-alpine w-full" style={{ height: '800px' }}>
-      <AgGridReact
-        rowData={rowData}
-        columnDefs={columnDefs}
-        defaultColDef={defaultColDef}
-        pagination={true}
-        paginationPageSize={10}
-        animateRows={true}
-        rowHeight={120} // Increased row height to accommodate content
-        headerHeight={50}
-        suppressRowClickSelection={true}
-        rowClass="border-b border-gray-200 hover:bg-gray-50"
-        theme="legacy" // Use legacy theme to avoid conflict with CSS files
-      />
+  if (loading) {
+    return (
+      <main className="container mx-auto p-4">
+        <h1 className="text-3xl font-bold mb-6">Latest Spread Suggestions</h1>
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg">Loading spread suggestions...</div>
+        </div>
+      </main>
+    );
+  }
 
-      <style jsx global>{`
-        .ag-theme-alpine {
-          --ag-border-radius: 16px;
-          --ag-card-radius: 16px;
-        }
-        
-        .ag-theme-alpine .ag-root-wrapper {
-          border-radius: 16px;
-          border: 1px solid #e5e7eb;
-          box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-        }
-        
-        .ag-theme-alpine .ag-header {
-          background-color: #f9fafb;
-          border-bottom: 1px solid #e5e7eb;
-        }
-        
-        .ag-theme-alpine .ag-header-cell {
-          font-weight: 600;
-        }
-        
-        .ag-theme-alpine .ag-row:hover {
-          background-color: #f9fafb;
-        }
-        
-        .ag-theme-alpine .ag-cell {
-          padding: 8px 12px;
-        }
-      `}</style>
-    </div>
+  if (error) {
+    return (
+      <main className="container mx-auto p-4">
+        <h1 className="text-3xl font-bold mb-6">Latest Spread Suggestions</h1>
+        <div className="flex justify-center items-center h-64">
+          <div className="text-lg text-red-600">{error}</div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6">Latest Spread Suggestions</h1>
+      
+      <div className="ag-theme-alpine w-full" style={{ height: '800px' }}>
+        <AgGridReact
+          rowData={rowData}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          pagination={true}
+          paginationPageSize={10}
+          animateRows={true}
+          rowHeight={120}
+          headerHeight={50}
+          suppressRowClickSelection={true}
+          rowClass="border-b border-gray-200 hover:bg-gray-50"
+          theme="legacy"
+        />
+
+        <style jsx global>{`
+          .ag-theme-alpine {
+            --ag-border-radius: 16px;
+            --ag-card-radius: 16px;
+          }
+          
+          .ag-theme-alpine .ag-root-wrapper {
+            border-radius: 16px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+          }
+          
+          .ag-theme-alpine .ag-header {
+            background-color: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+          }
+          
+          .ag-theme-alpine .ag-header-cell {
+            font-weight: 600;
+          }
+          
+          .ag-theme-alpine .ag-row:hover {
+            background-color: #f9fafb;
+          }
+          
+          .ag-theme-alpine .ag-cell {
+            padding: 8px 12px;
+          }
+        `}</style>
+      </div>
+    </main>
   );
 }
