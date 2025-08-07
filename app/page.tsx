@@ -1,7 +1,7 @@
 "use client"
 import Image from "next/image";
 import SpreadSuggestionsServer from "./(components)/Spread1";
-
+import Link from 'next/link';
 export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -53,6 +53,12 @@ export default function Home() {
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-white mb-4">Live Dashboard</h2>
             <p className="text-white/60">Real-time QUBT stock analysis and option strategies</p>
+         go to DataPage1
+         <Link href="/DataPage1">
+          <button className="bg-blue-500 text-white px-4 py-2 rounded-md">
+            View in AG Grid
+          </button>
+        </Link>
           </div>
           
           {/* Dashboard container with subtle styling */}
