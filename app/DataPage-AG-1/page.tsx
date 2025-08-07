@@ -2,10 +2,14 @@
 
 import { useMemo, useEffect, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { ColDef, ICellRendererParams } from 'ag-grid-community';
+import { ColDef, ICellRendererParams, ModuleRegistry } from 'ag-grid-community';
+import { AllCommunityModule } from 'ag-grid-community';
 import { format } from 'date-fns';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+
+// Register AG Grid modules
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 // Define the type for a SpreadSuggestion, matching your Prisma schema
 interface SpreadSuggestion {
@@ -21,8 +25,9 @@ interface SpreadSuggestion {
   put_max_loss: string;
   put_breakeven: string;
   technical_justification: string[];
-  expiration_date: Date;
+  expiration_date: string; // Now serialized as string from server
   expected_move: number;
+  // price?: number;            // ← newly added
 }
 
 // Custom cell renderer for Call Leg details
@@ -114,19 +119,24 @@ const ExpectedMoveRenderer = (params: ICellRendererParams) => {
   );
 };
 
-interface SpreadSuggestionsPageProps {
+interface SpreadSuggestionsGridProps {
   suggestions: SpreadSuggestion[];
 }
 
-export default function SpreadSuggestionsPage({ suggestions }: SpreadSuggestionsPageProps) {
+export default function SpreadSuggestionsGrid({ suggestions }: SpreadSuggestionsGridProps) {
   const [rowData, setRowData] = useState<SpreadSuggestion[]>([]);
+
+  console.log('Grid received suggestions:', suggestions); // Debug log
 
   useEffect(() => {
     // Sort suggestions by expiration date (desc) to match original behavior
-    const sortedSuggestions = [...suggestions].sort((a, b) => 
-      new Date(b.expiration_date).getTime() - new Date(a.expiration_date).getTime()
-    );
-    setRowData(sortedSuggestions);
+    if (suggestions && Array.isArray(suggestions)) {
+      const sortedSuggestions = [...suggestions].sort((a, b) => 
+        new Date(b.expiration_date).getTime() - new Date(a.expiration_date).getTime()
+      );
+      console.log('Sorted suggestions:', sortedSuggestions); // Debug log
+      setRowData(sortedSuggestions);
+    }
   }, [suggestions]);
 
   const columnDefs: ColDef[] = useMemo(() => [
@@ -185,33 +195,21 @@ export default function SpreadSuggestionsPage({ suggestions }: SpreadSuggestions
     autoHeight: true, // Allows rows to expand based on content
   }), []);
 
-  if (suggestions.length === 0) {
-    return (
-      <main className="container mx-auto p-4">
-        <h1 className="text-3xl font-bold mb-6">Latest Spread Suggestions</h1>
-        <p>No spread suggestions found.</p>
-      </main>
-    );
-  }
-
   return (
-    <main className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">Latest Spread Suggestions</h1>
-      
-      <div className="ag-theme-alpine w-full" style={{ height: '800px' }}>
-        <AgGridReact
-          rowData={rowData}
-          columnDefs={columnDefs}
-          defaultColDef={defaultColDef}
-          pagination={true}
-          paginationPageSize={10}
-          animateRows={true}
-          rowHeight={120} // Increased row height to accommodate content
-          headerHeight={50}
-          suppressRowClickSelection={true}
-          rowClass="border-b border-gray-200 hover:bg-gray-50"
-        />
-      </div>
+    <div className="ag-theme-alpine w-full" style={{ height: '800px' }}>
+      <AgGridReact
+        rowData={rowData}
+        columnDefs={columnDefs}
+        defaultColDef={defaultColDef}
+        pagination={true}
+        paginationPageSize={10}
+        animateRows={true}
+        rowHeight={120} // Increased row height to accommodate content
+        headerHeight={50}
+        suppressRowClickSelection={true}
+        rowClass="border-b border-gray-200 hover:bg-gray-50"
+        theme="legacy" // Use legacy theme to avoid conflict with CSS files
+      />
 
       <style jsx global>{`
         .ag-theme-alpine {
@@ -242,6 +240,6 @@ export default function SpreadSuggestionsPage({ suggestions }: SpreadSuggestions
           padding: 8px 12px;
         }
       `}</style>
-    </main>
+    </div>
   );
 }
