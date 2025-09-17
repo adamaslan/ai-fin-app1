@@ -4,7 +4,8 @@ import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import prisma from "@/app/lib/prisma";
 
-export const authNode = NextAuth({
+// Export all helpers so you can use them in API routes and pages
+export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma), // ✅ NeonDB via Prisma
   providers: [
     Google({
@@ -13,7 +14,6 @@ export const authNode = NextAuth({
     }),
   ],
   session: {
-    strategy: "database", 
-    
+    strategy: "database", // ✅ sessions stored in DB
   },
 });

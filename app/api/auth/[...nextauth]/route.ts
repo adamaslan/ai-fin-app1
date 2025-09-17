@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { authNode } from "@/auth-node";
+import { handlers } from "@/auth-node";
 
-export const { GET, POST } = authNode.handlers;
+export const { GET, POST } = handlers;

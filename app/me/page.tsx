@@ -1,7 +1,7 @@
-import { auth } from "@/auth"
+import { auth } from "@/auth-node";
 
 export default async function MePage() {
-  const session = await auth()
+  const session = await auth();
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">My Session</h1>
@@ -9,5 +9,5 @@ export default async function MePage() {
         {JSON.stringify(session, null, 2)}
       </pre>
     </div>
-  )
+  );
 }
