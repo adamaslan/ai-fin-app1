@@ -61,6 +61,18 @@ export default function Home() {
         </Link>
           </div>
           
+          <div className="flex gap-4">
+        <Link href="/login">
+          <button className="bg-green-600 px-4 py-2 rounded hover:bg-green-700">
+            Login with Google
+          </button>
+        </Link>
+        <Link href="/me">
+          <button className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">
+            View Session
+          </button>
+        </Link>
+      </div>
           {/* Dashboard container with subtle styling */}
 
 <div className="opacity-0 animate-fade-in-up bg-white/5 text-white/60 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:border-green-500/30">
