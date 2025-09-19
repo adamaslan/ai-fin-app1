@@ -1,12 +1,10 @@
-// auth-node.ts
-import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import prisma from "@/app/lib/prisma";
+import NextAuth from "next-auth"
+import Google from "next-auth/providers/google"
+import { PrismaAdapter } from "@auth/prisma-adapter"
+import prisma from "@/app/lib/prisma"
 
-// Export all helpers so you can use them in API routes and pages
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma), // ✅ NeonDB via Prisma
+  adapter: PrismaAdapter(prisma),
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -14,6 +12,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   session: {
-    strategy: "database", // ✅ sessions stored in DB
+    strategy: "database",
   },
-});
+  callbacks: {
+    async redirect({ baseUrl }) {
+      return `${baseUrl}/Dashboard`
+    }
+  }
+})
