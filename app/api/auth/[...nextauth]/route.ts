@@ -1,6 +1,18 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+import NextAuth from "next-auth"
+import GoogleProvider from "next-auth/providers/google"
 
-import { handlers } from "@/auth-node";
+const handler = NextAuth({
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    })
+  ],
+  callbacks: {
+    async redirect({ baseUrl }) {
+      return `${baseUrl}/Dashboard`
+    }
+  }
+})
 
-export const { GET, POST } = handlers;
+export { handler as GET, handler as POST }
