@@ -4,6 +4,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import prisma from "@/app/lib/prisma"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: process.env.AUTH_SECRET, // ✅ Required in production
   adapter: PrismaAdapter(prisma),
   providers: [
     Google({
@@ -12,11 +13,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   session: {
-    strategy: "database",
+    strategy: "database", // ✅ Fine, since you’re using Prisma
   },
   callbacks: {
     async redirect({ baseUrl }) {
+      // ✅ This is fine — ensures successful logins land on /Dashboard
       return `${baseUrl}/Dashboard`
-    }
-  }
+    },
+  },
 })
