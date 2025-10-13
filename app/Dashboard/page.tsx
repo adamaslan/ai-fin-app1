@@ -1,9 +1,18 @@
 import Image from "next/image";
+import { auth, currentUser } from "@clerk/nextjs";
 import SpreadSuggestionsServer from "../(components)/Spread1";
 import Link from "next/link";
 import Nav from "../components/Navbar/page";
+import { auth, currentUser } from "@clerk/nextjs";
 
 export default function Home() {
+   const { userId } = await auth();
+
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
+  const user = await currentUser();
   return (
     <>
       {/* Navbar (client) */}
@@ -18,6 +27,11 @@ export default function Home() {
 
         {/* Main content */}
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
+        
+         <div className="p-8">
+      <h1 className="text-3xl font-bold">Welcome, {user?.firstName}!</h1>
+      <p className="text-gray-600 mt-2">Email: {user?.emailAddresses[0]?.emailAddress}</p>
+    </div>
           {/* Hero section */}
           <div className="text-center space-y-8 max-w-4xl mb-12">
             {/* Logo */}

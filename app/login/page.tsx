@@ -1,4 +1,5 @@
-import SignIn from "@/components/sign-in"
+// import SignIn from "@/components/sign-in"
+import { SignIn } from "@clerk/nextjs";
 
 export default function LoginPage() {
   return (
