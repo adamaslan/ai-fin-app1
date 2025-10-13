@@ -1,10 +1,18 @@
 import Image from "next/image";
+import { auth, currentUser } from "@clerk/nextjs";
 import SpreadSuggestionsServer from "../(components)/Spread1";
 import Link from "next/link";
 import Nav from "../components/Navbar/page";
 import { auth, currentUser } from "@clerk/nextjs";
 
 export default function Home() {
+   const { userId } = await auth();
+
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
+  const user = await currentUser();
   return (
     <>
       {/* Navbar (client) */}
