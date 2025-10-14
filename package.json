@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
+    "@clerk/nextjs": "^6.33.3",
     "@prisma/adapter-neon": "^6.10.1",
     "@prisma/client": "^6.16.2",
     "ag-grid-community": "^34.1.1",

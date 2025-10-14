@@ -1,13 +1,13 @@
 import Image from "next/image";
 import SpreadSuggestionsServer from "./(components)/Spread1";
 import Link from "next/link";
-import Nav from "./components/Navbar/page";
+// import Nav from "./components/Navbar/page";
 
 export default function Home() {
   return (
     <>
       {/* Navbar (client) */}
-      <Nav />
+      {/* <Nav /> */}
 
       {/* Background gradient layers (don’t block clicks) */}
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative">
