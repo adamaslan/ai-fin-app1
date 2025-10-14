@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server'
 // import Nav from '../components/Navbar/page'
 import SpreadSuggestionsServer from '../(components)/Spread1'
-import Link from 'next/link'
+// import Link from 'next/link'
 
 export default async function DashboardPage() {
   // Protect this route - redirects to sign-in if not authenticated
