@@ -1,6 +1,6 @@
 # Clerk + Vercel + Next.js + Google OAuth Setup Guide
 
-This guide walks you through setting up Clerk authentication with Google OAuth provider in a Next.js application deployed on Vercel.
+This guide follows the official [Clerk Next.js Quickstart](https://clerk.com/docs/nextjs/getting-started/quickstart) and [Vercel integration documentation](https://vercel.com/integrations/clerk) to set up secure authentication in your Next.js application.
 
 ## Prerequisites
 
@@ -14,58 +14,34 @@ This guide walks you through setting up Clerk authentication with Google OAuth p
 1. Go to [clerk.com](https://clerk.com) and sign up for a free account
 2. Create a new application
 3. Select **Next.js** as your framework
-4. Choose your preferred sign-in methods (we'll configure Google OAuth)
+4. Clerk will automatically provide your API keys
 5. Complete the onboarding process
 
-## Step 2: Set Up Google OAuth Provider
+## Step 2: Connect Clerk via Vercel Integration
 
-### Create a Google Cloud Project
+The easiest way to integrate Clerk with Vercel is through the official integration:
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Click on the project dropdown and select **New Project**
-3. Enter a project name (e.g., "My Next.js App") and click **Create**
-4. Wait for the project to be created, then select it
+1. Go to [vercel.com/integrations/clerk](https://vercel.com/integrations/clerk)
+2. Click **Add Integration**
+3. Select the Vercel project you want to connect
+4. Authorize the integration
+5. Select your Clerk application from the dropdown
+6. Click **Install**
 
-### Enable Google+ API
+This will automatically:
+- Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` to your environment variables
+- Add `CLERK_SECRET_KEY` to your environment variables
+- Configure the middleware
+- Set up sign-in and sign-up routes
 
-1. In the Google Cloud Console, go to **APIs & Services** > **Library**
-2. Search for "Google+ API"
-3. Click on it and press **Enable**
+If you don't have a Vercel project yet, follow Step 3 first.
 
-### Create OAuth 2.0 Credentials
-
-1. Go to **APIs & Services** > **Credentials**
-2. Click **+ Create Credentials** > **OAuth client ID**
-3. If prompted, configure the OAuth consent screen:
-   - Choose **External** as the user type
-   - Fill in the app name, user support email, and developer contact info
-   - On the scopes page, add: `email`, `profile`, `openid`
-   - Add test users if needed (your email)
-   - Review and create
-4. Back on the credentials page, click **+ Create Credentials** > **OAuth client ID** again
-5. Select **Web application**
-6. Add authorized redirect URIs:
-   - `http://localhost:3000/auth/callback/google` (for local development)
-   - `https://yourdomain.vercel.app/auth/callback/google` (for production, replace with your domain)
-   - `https://yourdomain.vercel.app/auth/google/callback` (alternative format)
-7. Click **Create**
-8. Copy your **Client ID** and **Client Secret** — you'll need these
-
-## Step 3: Configure Clerk with Google OAuth
-
-1. Go to your [Clerk Dashboard](https://dashboard.clerk.com)
-2. Select your application
-3. Go to **Integrations** or **Social Connections**
-4. Find **Google** and click **Connect**
-5. Paste your Google Client ID and Client Secret
-6. Click **Connect**
-
-## Step 4: Set Up Your Next.js Project
+## Step 3: Set Up Your Next.js Project
 
 ### Create a New Next.js Project
 
 ```bash
-npx create-next-app@latest my-app --typescript --tailwind
+npx create-next-app@latest my-app --typescript --tailwind --app
 cd my-app
 ```
 
@@ -75,246 +51,526 @@ cd my-app
 npm install @clerk/nextjs
 ```
 
-### Configure Environment Variables
+### Get Your API Keys
 
-Create a `.env.local` file in your project root:
+If you haven't used the Vercel integration, manually add your keys:
+
+1. Go to [dashboard.clerk.com](https://dashboard.clerk.com)
+2. Select your application
+3. Go to **API Keys** and copy:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+   - `CLERK_SECRET_KEY`
+
+Create `.env.local`:
 
 ```env
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_publishable_key
 CLERK_SECRET_KEY=your_secret_key
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/login
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
 ```
 
-You can find your keys in the Clerk Dashboard under **API Keys**.
+These environment variables configure:
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL` - Where to find your sign-in page
+- `NEXT_PUBLIC_CLERK_SIGN_UP_URL` - Where to find your sign-up page
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` - **Redirects to dashboard after login**
+- `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` - **Redirects to dashboard after signup**
 
-### Update `middleware.ts`
+## Step 4: Update Your Root Layout
 
-Create or update `middleware.ts` in your project root:
-
-```typescript
-import { authMiddleware } from "@clerk/nextjs";
-
-export default authMiddleware({
-  publicRoutes: ["/", "/sign-in", "/sign-up"],
-});
-
-export const config = {
-  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
-};
-```
-
-### Update `layout.tsx`
-
-Update your root layout file (`app/layout.tsx`):
+Update `app/layout.tsx` with the official Clerk components:
 
 ```typescript
-import { ClerkProvider } from '@clerk/nextjs'
-import type { Metadata } from "next";
+import type { Metadata } from 'next'
+import {
+  ClerkProvider,
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from '@clerk/nextjs'
+import { Geist, Geist_Mono } from 'next/font/google'
+import './globals.css'
+
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+})
+
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+})
 
 export const metadata: Metadata = {
-  title: "My App",
-  description: "Generated by create next app",
-};
+  title: 'My App - Authentication with Clerk',
+  description: 'Secure authentication powered by Clerk',
+}
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode;
-}) {
+}: Readonly<{
+  children: React.ReactNode
+}>) {
   return (
     <ClerkProvider>
       <html lang="en">
-        <body>{children}</body>
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        >
+          <header className="flex justify-end items-center p-4 gap-4 h-16 bg-white shadow-sm">
+            <SignedOut>
+              <SignInButton>
+                <button className="bg-blue-600 text-white rounded-full font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 cursor-pointer hover:bg-blue-700 transition">
+                  Sign In
+                </button>
+              </SignInButton>
+              <SignUpButton>
+                <button className="bg-green-600 text-white rounded-full font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 cursor-pointer hover:bg-green-700 transition">
+                  Sign Up
+                </button>
+              </SignUpButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+          </header>
+          {children}
+        </body>
       </html>
     </ClerkProvider>
-  );
+  )
 }
 ```
 
-### Create Sign-In Page
+## Step 5: Set Up Middleware
 
-Create `app/sign-in/[[...index]]/page.tsx`:
+Create `middleware.ts` in your project root:
 
 ```typescript
-import { SignIn } from "@clerk/nextjs";
+import { clerkMiddleware } from '@clerk/nextjs/server'
 
-export default function SignInPage() {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <SignIn />
-    </div>
-  );
+export default clerkMiddleware()
+
+export const config = {
+  matcher: [
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest))(?:.*)|api|trpc)(.*)',
+  ],
 }
 ```
 
-### Create Sign-Up Page
+## Step 6: Create Protected Pages
 
-Create `app/sign-up/[[...index]]/page.tsx`:
-
-```typescript
-import { SignUp } from "@clerk/nextjs";
-
-export default function SignUpPage() {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <SignUp />
-    </div>
-  );
-}
-```
-
-### Create a Protected Page
+### Create Dashboard Page
 
 Create `app/dashboard/page.tsx`:
 
 ```typescript
-import { auth, currentUser } from "@clerk/nextjs";
-import { redirect } from "next/navigation";
+import { auth } from '@clerk/nextjs/server'
+import Nav from '@/components/Navbar/page'
+import SpreadSuggestionsServer from '@/(components)/Spread1'
+import Link from 'next/link'
 
 export default async function DashboardPage() {
-  const { userId } = await auth();
+  // Protect this route - redirects to sign-in if not authenticated
+  const { userId } = await auth()
 
   if (!userId) {
-    redirect("/sign-in");
+    return null
   }
 
-  const user = await currentUser();
-
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold">Welcome, {user?.firstName}!</h1>
-      <p className="text-gray-600 mt-2">Email: {user?.emailAddresses[0]?.emailAddress}</p>
-    </div>
-  );
+    <>
+      <Nav />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-12">
+            <h1 className="text-5xl sm:text-7xl font-black tracking-tight mb-8">
+              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Stock Newest Dashboard Sept 19th
+              </span>
+            </h1>
+            <p className="text-white/60 text-lg">
+              Welcome! You are signed in with user ID:{' '}
+              <span className="font-mono bg-white/10 px-2 py-1 rounded border border-white/20">
+                {userId}
+              </span>
+            </p>
+          </div>
+
+          <div className="animate-fade-in-up bg-white/5 text-white/60 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:border-green-500/30">
+            <SpreadSuggestionsServer />
+          </div>
+        </div>
+      </div>
+    </>
+  )
 }
 ```
 
-### Update Home Page
+### Create Profile Page with User Data
+
+Create `app/profile/page.tsx`:
+
+```typescript
+import { auth, clerkClient } from '@clerk/nextjs/server'
+
+export default async function ProfilePage() {
+  const { userId } = await auth()
+
+  if (!userId) {
+    return null
+  }
+
+  const client = await clerkClient()
+  const user = await client.users.getUser(userId)
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h1 className="text-3xl font-bold mb-6">Your Profile</h1>
+
+          <div className="space-y-6">
+            {/* Profile Image */}
+            {user.profileImageUrl && (
+              <div className="flex items-center space-x-4">
+                <img
+                  src={user.profileImageUrl}
+                  alt="Profile"
+                  className="w-24 h-24 rounded-full"
+                />
+              </div>
+            )}
+
+            {/* User Info */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Name
+              </label>
+              <p className="text-lg">
+                {user.firstName} {user.lastName}
+              </p>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email
+              </label>
+              <p className="text-lg">
+                {user.emailAddresses[0]?.emailAddress}
+              </p>
+            </div>
+
+            {/* User ID */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                User ID
+              </label>
+              <p className="font-mono text-sm bg-gray-100 px-3 py-2 rounded">
+                {user.id}
+              </p>
+            </div>
+
+            {/* Account Created */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Account Created
+              </label>
+              <p className="text-lg">
+                {new Date(user.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+```
+
+## Step 7: Create Protected API Routes
+
+### Protected API Route Example
+
+Create `app/api/protected/route.ts`:
+
+```typescript
+import { auth } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
+
+export async function GET() {
+  // Protect this route - returns 404 if not authenticated
+  await auth.protect()
+
+  return NextResponse.json({
+    message: 'This is a protected API route',
+    timestamp: new Date().toISOString(),
+  })
+}
+```
+
+### Update User API Route
+
+Create `app/api/user/update/route.ts`:
+
+```typescript
+import { NextResponse, NextRequest } from 'next/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
+
+export async function POST(req: NextRequest) {
+  // Get the authenticated user
+  const { userId } = await auth()
+
+  // Redirect to sign-in if not authenticated
+  if (!userId) {
+    return NextResponse.redirect(new URL('/sign-in', req.url))
+  }
+
+  try {
+    // Parse the request body
+    const { firstName, lastName } = await req.json()
+
+    // Update the user using clerkClient
+    const client = await clerkClient()
+    const user = await client.users.updateUser(userId, {
+      firstName,
+      lastName,
+    })
+
+    return NextResponse.json({ user })
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to update user' },
+      { status: 400 }
+    )
+  }
+}
+```
+
+## Step 8: Set Up Google OAuth
+
+### Create a Google Cloud Project
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Click on the project dropdown and select **New Project**
+3. Enter a project name and click **Create**
+
+### Enable Google+ API
+
+1. Go to **APIs & Services** > **Library**
+2. Search for "Google+ API"
+3. Click it and press **Enable**
+
+### Create OAuth 2.0 Credentials
+
+1. Go to **APIs & Services** > **Credentials**
+2. Click **+ Create Credentials** > **OAuth client ID**
+3. If prompted, configure the OAuth consent screen:
+   - Choose **External** as user type
+   - Fill in app name, user support email, and developer contact
+   - Add scopes: `email`, `profile`, `openid`
+   - Add test users if needed
+   - Review and create
+4. Back on credentials page, click **+ Create Credentials** > **OAuth client ID**
+5. Select **Web application**
+6. Add authorized redirect URIs:
+   - `http://localhost:3000` (development)
+   - `https://yourdomain.vercel.app` (production)
+7. Click **Create**
+8. Copy your **Client ID** and **Client Secret**
+
+### Connect Google to Clerk
+
+1. Go to [dashboard.clerk.com](https://dashboard.clerk.com)
+2. Select your application
+3. Go to **Integrations** > **Google**
+4. Paste your Client ID and Client Secret
+5. Click **Connect**
+
+### Enable Google in Sign-In UI
+
+1. In Clerk Dashboard, go to **User & Authentication** > **Social Connections**
+2. Toggle **Google** to **ON**
+
+## Step 9: Create a Home Page
 
 Update `app/page.tsx`:
 
 ```typescript
-import { auth, currentUser } from "@clerk/nextjs";
-import Link from "next/link";
+import { SignedIn, SignedOut } from '@clerk/nextjs'
+import Link from 'next/link'
 
-export default async function Home() {
-  const { userId } = await auth();
-  const user = await currentUser();
-
+export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to My App</h1>
-        
-        {userId ? (
-          <div>
-            <p className="text-xl mb-4">Hello, {user?.firstName}!</p>
-            <Link
-              href="/dashboard"
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg mr-4"
-            >
-              Go to Dashboard
+    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="text-center max-w-2xl">
+        <h1 className="text-5xl font-bold text-white mb-6">
+          Welcome to My App
+        </h1>
+        <p className="text-xl text-gray-300 mb-8">
+          Secure authentication powered by Clerk
+        </p>
+
+        <SignedOut>
+          <p className="text-gray-400 mb-8">
+            Sign in or sign up to get started
+          </p>
+        </SignedOut>
+
+        <SignedIn>
+          <div className="flex gap-4 justify-center">
+            <Link href="/dashboard">
+              <button className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
+                Go to Dashboard
+              </button>
             </Link>
-            <Link
-              href="/sign-out"
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg"
-            >
-              Sign Out
-            </Link>
-          </div>
-        ) : (
-          <div>
-            <Link
-              href="/sign-in"
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg mr-4"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/sign-up"
-              className="px-6 py-2 bg-green-600 text-white rounded-lg"
-            >
-              Sign Up
+            <Link href="/profile">
+              <button className="px-8 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition">
+                View Profile
+              </button>
             </Link>
           </div>
-        )}
+        </SignedIn>
       </div>
     </main>
-  );
+  )
 }
 ```
 
-## Step 5: Test Locally
+## Step 10: Test Locally
 
 ```bash
 npm run dev
 ```
 
-Visit `http://localhost:3000` and test the sign-in/sign-up flow with your Google account.
+Visit `http://localhost:3000` and test:
 
-## Step 6: Deploy to Vercel
+1. Click "Sign Up" or "Sign In" in the header
+2. Sign up with email or Google
+3. Verify redirect to dashboard
+4. View profile page and user data
+5. Test the API route: `GET /api/protected`
+6. Sign out and verify
 
-### Push to Git
+## Step 11: Deploy to Vercel
 
-```bash
-git add .
-git commit -m "Add Clerk authentication"
-git push origin main
+### Option A: Using Vercel Integration (Recommended)
+
+1. Push your code to GitHub
+2. Go to [vercel.com/integrations/clerk](https://vercel.com/integrations/clerk)
+3. Click **Add Integration** and select your Vercel project
+4. The integration will automatically deploy and configure everything
+
+### Option B: Manual Deployment
+
+1. Push your code to GitHub
+2. Go to [vercel.com](https://vercel.com)
+3. Click **Add New** > **Project**
+4. Select your repository
+5. Click **Deploy** (it will ask for environment variables during setup)
+
+### Adding Environment Variables to Vercel Dashboard
+
+After deployment, you need to add all your environment variables:
+
+1. Go to [vercel.com](https://vercel.com) and select your project
+2. Click **Settings** in the top navigation
+3. Click **Environment Variables** in the left sidebar
+4. Add each variable by clicking **Add New**:
+
+```
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = your_publishable_key
+CLERK_SECRET_KEY = your_secret_key
+NEXT_PUBLIC_CLERK_SIGN_IN_URL = /login
+NEXT_PUBLIC_CLERK_SIGN_UP_URL = /sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL = /dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL = /dashboard
 ```
 
-### Deploy
+5. For each variable:
+   - Enter the **Name** (e.g., `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`)
+   - Enter the **Value** from your `.env.local`
+   - Select which environments to apply to: **Production**, **Preview**, **Development**
+   - Click **Add**
 
-1. Go to [vercel.com](https://vercel.com) and sign in
-2. Click **Add New** > **Project**
-3. Select your repository
-4. Click **Import**
-5. Add environment variables:
-   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-   - `CLERK_SECRET_KEY`
-   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL`
-   - `NEXT_PUBLIC_CLERK_SIGN_UP_URL`
-   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL`
-   - `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL`
-6. Click **Deploy**
+6. After adding all variables, go to **Deployments**
+7. Click the three dots on your latest deployment
+8. Click **Redeploy** to apply the environment variables
 
-### Update Google OAuth Redirect URIs
+**Important:** Variables starting with `NEXT_PUBLIC_` are public and safe to expose. Variables like `CLERK_SECRET_KEY` are secret and should never be committed to version control.
 
-1. Go back to Google Cloud Console
-2. Update the OAuth consent screen and credentials with your Vercel domain:
-   - `https://yourproject.vercel.app/auth/callback/google`
+### Update Google OAuth
+
+After deployment, update your Google OAuth redirect URIs:
+
+1. Go to Google Cloud Console
+2. Go to **APIs & Services** > **Credentials**
+3. Click your OAuth app
+4. Add authorized redirect URI:
+   - `https://yourdomain.vercel.app`
+
+### Update Clerk Allowed Domains
+
+1. Go to [dashboard.clerk.com](https://dashboard.clerk.com)
+2. Select your application
+3. Go to **Domains**
+4. Add your Vercel deployment URL
+
+## Monitoring and Debugging
+
+### Check Vercel Logs
+
+1. Go to your Vercel project
+2. Click **Deployments**
+3. Select a deployment and click **View Function Logs**
+4. Monitor authentication requests
+
+### Clerk Dashboard Analytics
+
+1. Go to [dashboard.clerk.com](https://dashboard.clerk.com)
+2. Select your application
+3. Go to **Insights** to see:
+   - Total sign-ups
+   - Sign-in frequency
+   - Active users
+   - Sign-up sources
 
 ## Troubleshooting
 
 ### "Redirect URI mismatch" error
 
-- Ensure your redirect URIs in Google Cloud Console match your application URL
-- For local development, use `http://localhost:3000`
-- For production, use your Vercel domain
+- Ensure redirect URIs in Google Cloud match your app URLs (with and without `www.`)
+- Add both `http://localhost:3000` and `https://yourdomain.vercel.app`
 
-### Missing environment variables
+### Environment variables not working
 
-- Double-check that all environment variables are set in `.env.local` (local) and Vercel dashboard (production)
-- Environment variables starting with `NEXT_PUBLIC_` are exposed to the browser
+- Verify variables are set in Vercel dashboard
+- Redeploy after adding environment variables
+- Check that variable names start with `NEXT_PUBLIC_` if used client-side
 
-### Google sign-in not appearing
+### Middleware errors
 
-- Verify that Google OAuth is connected in Clerk Dashboard
-- Clear browser cache and restart dev server
-- Check that your Google project has Google+ API enabled
+- Ensure `middleware.ts` is in project root (not in `app` folder)
+- Clear `.next` folder: `rm -rf .next`
+- Rebuild: `npm run dev`
+
+### Protected routes not redirecting
+
+- Use `await auth()` to get user data
+- Manually redirect if `userId` is null
+- Don't use `auth.protect()` in React Server Components without proper error handling
 
 ## Additional Resources
 
-- [Clerk Documentation](https://clerk.com/docs)
-- [Clerk Next.js Guide](https://clerk.com/docs/quickstarts/nextjs)
+- [Clerk Next.js Documentation](https://clerk.com/docs/nextjs/overview)
+- [Clerk Quickstart](https://clerk.com/docs/nextjs/getting-started/quickstart)
+- [Vercel Clerk Integration](https://vercel.com/integrations/clerk)
 - [Google OAuth Documentation](https://developers.google.com/identity/protocols/oauth2)
-- [Vercel Documentation](https://vercel.com/docs)
+- [Next.js Documentation](https://nextjs.org/docs)
 
-## Next Steps
-
-- Add more OAuth providers (GitHub, Discord, etc.)
-- Implement custom sign-in flow
-- Set up webhooks for user events
-- Add database integration for user profiles
+Your authentication system is now production-ready! 🚀

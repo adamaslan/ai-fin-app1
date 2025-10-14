@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
-import Nav from '../components/Navbar/page'
+// import Nav from '../components/Navbar/page'
 import SpreadSuggestionsServer from '../(components)/Spread1'
 import Link from 'next/link'
 
@@ -13,13 +13,13 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <Nav />
+      {/* <Nav /> */}
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 p-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-12">
             <h1 className="text-5xl sm:text-7xl font-black tracking-tight mb-8">
               <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Stock Newest Dashboard Sept 19th
+                Stock Newest Dashboard Oct 14th
               </span>
             </h1>
             <p className="text-white/60 text-lg">
