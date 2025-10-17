@@ -567,6 +567,9 @@ After deployment, update your Google OAuth redirect URIs:
 
 ## Additional Resources
 
+-[demo] (https://nextjs-auth-starter-template-kit.vercel.app/)
+
+
 - [Clerk Next.js Documentation](https://clerk.com/docs/nextjs/overview)
 - [Clerk Quickstart](https://clerk.com/docs/nextjs/getting-started/quickstart)
 - [Vercel Clerk Integration](https://vercel.com/integrations/clerk)
