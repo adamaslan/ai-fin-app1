@@ -123,9 +123,9 @@ export default async function DashboardPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
+  // Make this more dynamic later
   const symbol = "RGTI";
   // require data from GCS only; no hard-coded fallback
-  const date = undefined;
 
   let fetched: TechnicalDataResponse | null = null;
   try {
@@ -275,8 +275,8 @@ export default async function DashboardPage() {
                   <h4 className="text-sm font-semibold text-gray-300">Risk</h4>
                   <ul className="mt-2 text-sm text-gray-200 space-y-1 list-disc list-inside">
                     {/* If the analysis includes a risk array, render it; otherwise render a generic placeholder */}
-                    {Array.isArray((analysisData as any).risk) ? (
-                      (analysisData as any).risk.map((r: string, i: number) => (
+                    {Array.isArray(analysisData?.risk) ? (
+                      (analysisData!.risk as string[]).map((r: string, i: number) => (
                         <li key={i}>{r}</li>
                       ))
                     ) : (
@@ -294,8 +294,8 @@ export default async function DashboardPage() {
               <div className="p-4 bg-gray-800 rounded-lg">
                 <h4 className="text-sm font-semibold text-gray-300">Key Levels</h4>
                 <div className="mt-2 flex flex-wrap gap-3">
-                  {Array.isArray((analysisData as any).key_levels) ? (
-                    (analysisData as any).key_levels.map((k: string, i: number) => (
+                  {Array.isArray(analysisData?.key_levels) ? (
+                    (analysisData!.key_levels as string[]).map((k: string, i: number) => (
                       <div key={i} className="bg-gray-700 px-3 py-1 rounded-md">{k}</div>
                     ))
                   ) : (
@@ -310,7 +310,7 @@ export default async function DashboardPage() {
 
               <div>
                 <h4 className="text-sm font-semibold text-gray-300">Recommendation</h4>
-                <p className="mt-2 text-white">{(analysisData as any).recommendation ?? "No recommendation provided."}</p>
+                <p className="mt-2 text-white">{analysisData?.recommendation ?? "No recommendation provided."}</p>
               </div>
             </div>
           </section>
