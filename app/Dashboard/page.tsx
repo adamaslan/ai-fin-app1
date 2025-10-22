@@ -8,6 +8,34 @@ interface TechnicalDataResponse {
   date: string;
 }
 
+// Minimal typing for GCS API response prefixes
+interface GetFilesApiResponse {
+  prefixes?: string[];
+}
+
+// Types for the analysis JSON shown in the UI
+interface AnalysisSignal {
+  signal: string;
+  desc: string;
+  strength: string;
+  category: string;
+}
+
+interface AnalysisData {
+  symbol: string;
+  timestamp: string;
+  date: string;
+  analysis: string;
+  signal_count: number;
+  signals_analyzed: AnalysisSignal[];
+  // optional helper fields that may appear in the Gemini/analysis JSON
+  overall_bias?: string;
+  long_term_comment?: string;
+  risk?: string[];
+  key_levels?: string[];
+  recommendation?: string;
+}
+
 export const dynamic = "force-dynamic";
 
 // Initialize Google Cloud Storage
@@ -24,12 +52,14 @@ async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResp
   const bucket = storage.bucket(BUCKET_NAME);
 
   // 1️⃣ Find latest date folder under /daily/
+  // bucket.getFiles with delimiter returns [files, , apiResponse]
   const [, , apiResponse] = await bucket.getFiles({
     prefix: "daily/",
     delimiter: "/",
   });
 
-  const dateFolders: string[] = (apiResponse as any).prefixes ?? [];
+  const apiTyped = apiResponse as GetFilesApiResponse | undefined;
+  const dateFolders: string[] = apiTyped?.prefixes ?? [];
   if (dateFolders.length === 0) {
     throw new Error("No date folders found in /daily/");
   }
@@ -94,95 +124,29 @@ export default async function DashboardPage() {
   if (!user) redirect("/sign-in");
 
   const symbol = "RGTI";
-  // For quick preview / dev: embed the provided analysis JSON and render it
-  const date = "2025-10-21";
+  // require data from GCS only; no hard-coded fallback
+  const date = undefined;
 
-  const analysisData = {
-    symbol: "RGTI",
-    timestamp: "20251021_103548",
-    date: "2025-10-21",
-    analysis: `Okay, let's analyze RGTI based on the provided technical data.
+  let fetched: TechnicalDataResponse | null = null;
+  try {
+    fetched = await getLatestTechnicalData(symbol);
+  } catch (err) {
+    console.error("Failed to fetch latest technical data:", err);
+    // Rethrow so that the page renders the error UI below
+    fetched = null;
+  }
 
-**1. STRONGEST SIGNAL:**
-
-The **Strongest Signal** is the confluence of **"LARGE LOSS - -6.6% today"** combined with the **"RSI BEARISH DIVERGENCE"** and **"MACD BEAR CROSS / MACD MOMENTUM DOWN / MACD WEAK MOMENTUM".** This indicates a likely shift in momentum and a potential short-term correction. While the ADX indicates a strong trend, the sharp price drop coupled with bearish divergences in momentum oscillators often precedes pullbacks.
-
-**2. OVERALL BIAS:**
-
-**Short-Term Bearish Bias with Moderate Confidence.** While the long-term trend remains bullish based on moving averages and Ichimoku cloud, the recent price action and momentum signals suggest a pullback is probable. The extreme volatility makes the current situation highly risky for new entries.
-
-**3. KEY LEVELS:**
-
-*   **Support 1:** $40.50 (previous low, psychological level)
-*   **Support 2:** $36.00 (20-day SMA)
-*   **Resistance 1:** $46.40 (yesterday's high)
-*   **Resistance 2:** $48.00 (recent peak)
-
-**4. RISK ASSESSMENT:**
-
-*   **High Volatility:** The extreme volatility (146.8%) increases the risk of sudden price swings and whipsaws.
-*   **Potential Pullback:** The bearish signals suggest a potential pullback, which could erase recent gains.
-*   **Overbought Conditions:** The price is significantly extended from the 200-day SMA, increasing the risk of mean reversion.
-*   **False Signals:** In such a volatile market, momentum indicators are more likely to give off false signals, especially divergences, so confirmation is necessary before taking action.
-
-**5. TRADING RECOMMENDATION:**
-
-**RECOMMENDATION: WAIT/REDUCE.**
-
-*   **Current Holders:** Consider reducing exposure or tightening stop-loss orders to protect profits. A stop-loss order near $40.50 could be prudent.
-*   **New Entries:** Avoid new long positions at this time. Wait for a clearer signal of support or a significant pullback to the 20-day SMA (~$36.00) before considering entry.
-
-**Entry/Exit Strategy (If Bullish Signal Confirmed):**
-
-*   **Entry:** If price retraces to the $36 level and shows signs of support (e.g., bullish candlestick patterns, RSI bouncing off oversold territory), consider a long entry.
-*   **Target 1:** $46.40 (yesterday's high)
-*   **Target 2:** $48.00 (recent peak)
-*   **Stop-Loss:** Place a stop-loss order just below the support level where you entered (e.g., if you entered at $36, place a stop-loss just below $36.)
-
-**Entry/Exit Strategy (If Bearish Signal Confirmed):**
-
-*   **Entry:** Look for a short entry around $43-$43.31, confirm with another drop and price action.
-*   **Target 1:** $40.50 (previous low, psychological level)
-*   **Target 2:** $36.00 (20-day SMA)
-*   **Stop-Loss:** Place a stop-loss order just above the entry point, for example, at $44.00.
-
-**6. TIMEFRAME:**
-
-**Short-Term to Medium-Term (Days to Weeks):** This analysis is primarily focused on the short-term pullback potential. Long-term investors may remain bullish, but should be aware of short-term volatility.
-`,
-    signal_count: 22,
-    signals_analyzed: [
-      { signal: "RSI BEARISH DIVERGENCE", desc: "Price up but RSI down", strength: "BEARISH", category: "DIVERGENCE" },
-      { signal: "MACD BEAR CROSS", desc: "MACD crossed below signal", strength: "BEARISH", category: "MACD" },
-      { signal: "MACD MOMENTUM DOWN", desc: "Histogram expanding bearish", strength: "BEARISH", category: "MACD" },
-      { signal: "MACD WEAK MOMENTUM", desc: "Histogram accelerating down", strength: "STRONG BEARISH", category: "MACD" },
-      { signal: "MACD FULLY BULLISH", desc: "Both lines above zero", strength: "BULLISH", category: "MACD" },
-      { signal: "OBV FALLING", desc: "Selling pressure increasing", strength: "BEARISH", category: "VOLUME" },
-      { signal: "STRONG UPTREND", desc: "ADX: 72.2", strength: "TRENDING", category: "TREND" },
-      { signal: "VERY STRONG TREND", desc: "ADX: 72.2", strength: "EXTREME", category: "TREND" },
-      { signal: "STRONG UPTREND CONFIRMED", desc: "+DI > -DI with high ADX", strength: "BULLISH", category: "TREND" },
-      { signal: "LARGE LOSS", desc: "-6.6% today", strength: "STRONG BEARISH", category: "PRICE_ACTION" },
-      { signal: "LOWER LOW", desc: "Breaking below yesterday", strength: "BEARISH", category: "PRICE_ACTION" },
-      { signal: "WIDE RANGE DAY", desc: "Range: 13.3%", strength: "VOLATILE", category: "PRICE_ACTION" },
-      { signal: "MOMENTUM BUILDING", desc: "Consecutive positive momentum", strength: "BULLISH", category: "MOMENTUM" },
-      { signal: "STRONG 20D MOMENTUM", desc: "+52.7% in 20 days", strength: "STRONG BULLISH", category: "MOMENTUM" },
-      { signal: "HIGH VOLATILITY", desc: "147% annualized", strength: "CAUTION", category: "VOLATILITY" },
-      { signal: "EXTREME VOLATILITY", desc: "147% annualized", strength: "HIGH RISK", category: "VOLATILITY" },
-      { signal: "ATR ELEVATED", desc: "Above-average true range", strength: "VOLATILE", category: "VOLATILITY" },
-      { signal: "ABOVE CLOUD", desc: "Ichimoku bullish", strength: "BULLISH", category: "ICHIMOKU" },
-      { signal: "CLOUD BULLISH", desc: "Senkou A above B", strength: "BULLISH", category: "ICHIMOKU" },
-      { signal: "MA ALIGNMENT BULLISH", desc: "10 > 20 > 50 SMA", strength: "STRONG BULLISH", category: "MA_TREND" },
-      { signal: "ABOVE 200 SMA", desc: "Long-term uptrend", strength: "BULLISH", category: "MA_TREND" },
-      { signal: "EXTENDED FROM 200 SMA", desc: "182.0% above", strength: "OVERBOUGHT", category: "MA_TREND" }
-    ]
-  } as const;
+  // Prefer geminiAnalysis (already matches AnalysisData shape), otherwise use technicalData
+  const analysisData = fetched && (fetched.geminiAnalysis ?? fetched.technicalData)
+    ? (fetched.geminiAnalysis ?? fetched.technicalData) as unknown as AnalysisData
+    : null;
 
   function StrengthBadge({ strength }: { strength: string }) {
     const base = "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium";
     const color =
       strength.includes("BEAR") || strength.includes("BEARISH")
         ? "bg-red-600 text-red-100"
-        : strength.includes("BULL") || strength.includes("BULLISH")
+        : strength.includes("BULL") || strength.includes("BULL  ISH")
         ? "bg-green-600 text-green-100"
         : strength.includes("EXTREME") || strength.includes("HIGH RISK")
         ? "bg-yellow-600 text-yellow-100"
@@ -191,12 +155,89 @@ The **Strongest Signal** is the confluence of **"LARGE LOSS - -6.6% today"** com
     return <span className={`${base} ${color}`}>{strength}</span>;
   }
 
+  // Minimal markdown-like renderer for the analysis text.
+  // Supports:
+  // - bold markers **bold**
+  // - standalone bold headings blocks (e.g. **1. TITLE:**)
+  // - bullet lists where lines start with '*'
+  function MarkdownAnalysis({ text }: { text: string }) {
+    const renderInline = (s: string, keyPrefix = "") => {
+      // split by ** to render bold segments
+      const parts = s.split(/\*\*/);
+      return parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <strong key={keyPrefix + i} className="font-semibold">{part}</strong>
+        ) : (
+          <span key={keyPrefix + i}>{part}</span>
+        )
+      );
+    };
+
+    const blocks = text.split(/\n\n+/).map(b => b.trim()).filter(Boolean);
+
+    return (
+      <div className="text-gray-200 mt-2 space-y-4">
+        {blocks.map((block, idx) => {
+          const trimmed = block.trim();
+
+          // Standalone bold heading block like: **1. STRONGEST SIGNAL:**
+          if (trimmed.startsWith("**") && trimmed.endsWith("**") && !trimmed.includes("\n")) {
+            const inner = trimmed.slice(2, -2).trim();
+            return <h4 key={idx} className="text-lg font-semibold text-white">{renderInline(inner, `h${idx}-`)}</h4>;
+          }
+
+          // Bullet list block: lines starting with '*'
+          const lines = block.split(/\n/).map(l => l.trim()).filter(Boolean);
+          const isList = lines.every(l => l.startsWith("*") || l.startsWith("-"));
+          if (isList) {
+            return (
+              <ul key={idx} className="list-disc list-inside space-y-1 text-sm text-gray-200">
+                {lines.map((line, i) => {
+                  // remove leading '*' or '-'
+                  const content = line.replace(/^\*+\s?|-+\s?/, "");
+                  return <li key={i}>{renderInline(content, `li${idx}-${i}-`)}</li>;
+                })}
+              </ul>
+            );
+          }
+
+          // Paragraph block — preserve single newlines as breaks
+          const paragraphParts = block.split(/\n/).map((p, i) => (
+            <span key={i}>
+              {renderInline(p, `p${idx}-${i}-`)}
+              {i < block.split(/\n/).length - 1 ? <br /> : null}
+            </span>
+          ));
+
+          return (
+            <p key={idx} className="text-sm leading-relaxed">
+              {paragraphParts}
+            </p>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (!analysisData) {
+    // Render a clear error UI when GCS JSON isn't available
+    return (
+      <main className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="max-w-lg text-center p-8 bg-gray-800 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-semibold text-red-400 mb-4">Data Not Available</h2>
+          <p className="text-gray-300 mb-4">No analysis JSON was found in Google Cloud Storage for symbol: <span className="font-mono">{symbol}</span>.</p>
+          <p className="text-sm text-gray-400">Ensure your GCS bucket <span className="font-mono">{BUCKET_NAME}</span> contains the expected files under <span className="font-mono">daily/&lt;YYYY-MM-DD&gt;/</span> and that the server has permission to read them.</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gray-900 text-white">
       <div className="container mx-auto py-10">
         <header className="mb-6">
           <h1 className="text-4xl font-bold">Welcome, {user.firstName || "User"}</h1>
-          <p className="text-gray-400 mt-2">RGTI Analysis — {date}</p>
+          <p className="text-gray-400 mt-2">{analysisData.symbol ?? symbol} Analysis</p>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -204,7 +245,7 @@ The **Strongest Signal** is the confluence of **"LARGE LOSS - -6.6% today"** com
           <section className="lg:col-span-2 bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-2xl font-semibold">RGTI — Technical Snapshot</h2>
+                <h2 className="text-2xl font-semibold">{analysisData.symbol ?? symbol} — Technical Snapshot</h2>
                 <p className="text-sm text-gray-300 mt-1">Signal count: {analysisData.signal_count}</p>
               </div>
               <div className="text-right">
@@ -216,40 +257,61 @@ The **Strongest Signal** is the confluence of **"LARGE LOSS - -6.6% today"** com
             <div className="mt-4 space-y-4">
               <div>
                 <h3 className="text-lg font-medium">Strongest Signal</h3>
-                <p className="text-gray-200 mt-1">Large loss (-6.6%) + RSI bearish divergence + bearish MACD signals — indicates likely short-term correction.</p>
+                {analysisData.analysis ? (
+                  <MarkdownAnalysis text={analysisData.analysis} />
+                ) : (
+                  <p className="text-gray-200 mt-1">(no analysis text provided)</p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 bg-gray-800 rounded-lg">
                   <h4 className="text-sm font-semibold text-gray-300">Overall Bias</h4>
-                  <p className="mt-2 text-white">Short-Term Bearish (Moderate Confidence)</p>
-                  <p className="text-sm text-gray-400 mt-1">Long-term trend remains bullish, but momentum and price action favor a pullback.</p>
+                  <p className="mt-2 text-white">{analysisData.overall_bias ?? "N/A"}</p>
+                  <p className="text-sm text-gray-400 mt-1">{analysisData.long_term_comment ?? ""}</p>
                 </div>
 
                 <div className="p-4 bg-gray-800 rounded-lg">
                   <h4 className="text-sm font-semibold text-gray-300">Risk</h4>
                   <ul className="mt-2 text-sm text-gray-200 space-y-1 list-disc list-inside">
-                    <li>High volatility (≈147%)</li>
-                    <li>False signals possible</li>
-                    <li>Overextended vs 200 SMA (mean reversion risk)</li>
+                    {/* If the analysis includes a risk array, render it; otherwise render a generic placeholder */}
+                    {Array.isArray((analysisData as any).risk) ? (
+                      (analysisData as any).risk.map((r: string, i: number) => (
+                        <li key={i}>{r}</li>
+                      ))
+                    ) : (
+                      <>
+                        <li>High volatility — see analysis</li>
+                        <li>Signals may be noisy</li>
+                        <li>Confirm before trading</li>
+                      </>
+                    )}
                   </ul>
                 </div>
               </div>
 
+              {/* Key levels — prefer key_levels array if present */}
               <div className="p-4 bg-gray-800 rounded-lg">
                 <h4 className="text-sm font-semibold text-gray-300">Key Levels</h4>
                 <div className="mt-2 flex flex-wrap gap-3">
-                  <div className="bg-gray-700 px-3 py-1 rounded-md">Support 1: $40.50</div>
-                  <div className="bg-gray-700 px-3 py-1 rounded-md">Support 2: $36.00</div>
-                  <div className="bg-gray-700 px-3 py-1 rounded-md">Resistance 1: $46.40</div>
-                  <div className="bg-gray-700 px-3 py-1 rounded-md">Resistance 2: $48.00</div>
+                  {Array.isArray((analysisData as any).key_levels) ? (
+                    (analysisData as any).key_levels.map((k: string, i: number) => (
+                      <div key={i} className="bg-gray-700 px-3 py-1 rounded-md">{k}</div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="bg-gray-700 px-3 py-1 rounded-md">Support 1</div>
+                      <div className="bg-gray-700 px-3 py-1 rounded-md">Support 2</div>
+                      <div className="bg-gray-700 px-3 py-1 rounded-md">Resistance 1</div>
+                    </>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-sm font-semibold text-gray-300">Recommendation</h4>
-                  <p className="mt-2 text-white">WAIT / REDUCE — tighten stops or wait for clearer support before adding longs.</p>
+                  <p className="mt-2 text-white">{(analysisData as any).recommendation ?? "No recommendation provided."}</p>
                 </div>
                 <div>
                   <a href="#raw-json" className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md">View Raw JSON</a>
@@ -271,20 +333,24 @@ The **Strongest Signal** is the confluence of **"LARGE LOSS - -6.6% today"** com
         <section className="mt-8">
           <h3 className="text-xl font-semibold mb-4">Signals Analyzed</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {analysisData.signals_analyzed.map((s, idx) => (
-              <div key={idx} className="p-3 bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg border border-gray-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold">{s.signal}</div>
-                    <div className="text-sm text-gray-300">{s.desc}</div>
+            {Array.isArray(analysisData.signals_analyzed) ? (
+              (analysisData.signals_analyzed as AnalysisSignal[]).map((s, idx) => (
+                <div key={idx} className="p-3 bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg border border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold">{s.signal}</div>
+                      <div className="text-sm text-gray-300">{s.desc}</div>
+                    </div>
+                    <div className="ml-3">
+                      <StrengthBadge strength={s.strength} />
+                    </div>
                   </div>
-                  <div className="ml-3">
-                    <StrengthBadge strength={s.strength} />
-                  </div>
+                  <div className="text-xs text-gray-400 mt-2">{s.category}</div>
                 </div>
-                <div className="text-xs text-gray-400 mt-2">{s.category}</div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <div className="text-gray-400">No signals array found in analysis JSON.</div>
+            )}
           </div>
         </section>
       </div>
