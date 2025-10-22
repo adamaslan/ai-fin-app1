@@ -1,5 +1,5 @@
 import Image from "next/image";
-import SpreadSuggestionsServer from "./(components)/Spread1";
+// import SpreadSuggestionsServer from "./(components)/Spread1";
 import Link from "next/link";
 // import Nav from "./components/Navbar/page";
 
@@ -69,7 +69,7 @@ export default function Home() {
                   Live Dashboard
                 </h2>
                 <p className="text-white/60">
-                  Real-time QUBT stock analysis and option strategies
+                 Login for stock analysis and option strategies
                 </p>
 
                 {/* Link to DataPage1 */}
@@ -82,7 +82,7 @@ export default function Home() {
 
               {/* Dashboard container */}
               <div className="animate-fade-in-up bg-white/5 text-white/60 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:border-green-500/30">
-                <SpreadSuggestionsServer />
+                {/* <SpreadSuggestionsServer /> */}
               </div>
             </div>
           </div>
