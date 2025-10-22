@@ -240,9 +240,9 @@ export default async function DashboardPage() {
           <p className="text-gray-400 mt-2">{analysisData.symbol ?? symbol} Analysis</p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           {/* Summary Card */}
-          <section className="lg:col-span-2 bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
+          <section className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-2xl font-semibold">{analysisData.symbol ?? symbol} — Technical Snapshot</h2>
@@ -308,25 +308,13 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-300">Recommendation</h4>
-                  <p className="mt-2 text-white">{(analysisData as any).recommendation ?? "No recommendation provided."}</p>
-                </div>
-                <div>
-                  <a href="#raw-json" className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md">View Raw JSON</a>
-                </div>
+              <div>
+                <h4 className="text-sm font-semibold text-gray-300">Recommendation</h4>
+                <p className="mt-2 text-white">{(analysisData as any).recommendation ?? "No recommendation provided."}</p>
               </div>
             </div>
           </section>
-
-          {/* Raw JSON Card */}
-          <aside id="raw-json" className="bg-gray-800 p-4 rounded-xl shadow-inner overflow-auto">
-            <h3 className="text-lg font-medium mb-3">Raw Analysis JSON</h3>
-            <pre className="bg-gray-900 p-3 rounded text-sm overflow-auto max-h-[60vh]">
-              <code>{JSON.stringify(analysisData, null, 2)}</code>
-            </pre>
-          </aside>
+          
         </div>
 
         {/* Detailed signals table */}
