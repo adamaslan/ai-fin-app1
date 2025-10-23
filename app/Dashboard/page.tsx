@@ -124,7 +124,7 @@ export default async function DashboardPage() {
   if (!user) redirect("/sign-in");
 
   // Make this more dynamic later
-  const symbol = "RGTI";
+  const symbol = "ORCL";
   // require data from GCS only; no hard-coded fallback
 
   let fetched: TechnicalDataResponse | null = null;
