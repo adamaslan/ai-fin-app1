@@ -35,7 +35,17 @@ interface AnalysisData {
 
 export const dynamic = "force-dynamic";
 
-const storage = new Storage();
+export const runtime = "nodejs"; // must be Node.js, not Edge
+
+const storage = new Storage({
+  projectId: process.env.GCP_PROJECT_ID,
+  credentials: {
+    client_email: process.env.GCP_CLIENT_EMAIL,
+    private_key: process.env.GCP_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+  },
+});
+
+
 const BUCKET_NAME = "ttb-bucket1";
 
 /**
