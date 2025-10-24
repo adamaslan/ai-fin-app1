@@ -8,7 +8,7 @@ export default function About() {
           <h1 className="text-4xl font-extrabold mb-4">About this app</h1>
 
           <p className="text-lg text-white/70 mb-6">
-            This app provides concise, trade-ready technical analysis and option strategy suggestions powered by
+            Our provides concise, trade-ready technical analysis and option strategy suggestions powered by
             automated signal processing and AI. It turns raw market data into prioritized signals, clear risk metrics,
             and actionable entry/exit ideas so traders can move faster.
           </p>
@@ -35,7 +35,7 @@ export default function About() {
           </section>
 
           <section className="bg-white/5 rounded-2xl p-6 mb-6 border border-white/10">
-            <h2 className="text-2xl font-semibold mb-3">Who it's for</h2>
+            <h2 className="text-2xl font-semibold mb-3">Who it&apos;s for</h2>
             <p className="text-white/70">Active traders, prop traders, and technically-minded investors who want fast, data-driven trade ideas with clear risk controls.</p>
           </section>
 
