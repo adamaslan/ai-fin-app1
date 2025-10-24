@@ -53,35 +53,6 @@ if (!process.env.GCP_CREDENTIALS) {
 // Initialize Storage with proper credential handling for Vercel
 
 // Test connection function with secure error handling
-async function testBucketAccess() {
-  try {
-    const bucket = storage.bucket(BUCKET_NAME);
-    const [exists] = await bucket.exists();
-    console.log(`Bucket ${BUCKET_NAME} exists: ${exists}`);
-    return exists;
-  } catch (error) {
-    // Only log error type, not full details that might contain credentials
-    console.error("Error accessing bucket:", error instanceof Error ? error.message : "Unknown error");
-    return false;
-  }
-}
-
-// Optional: Add type safety for credentials
-
-
-// For testing - you can call this in your page component
-// Then check the server logs in Vercel or your terminal
-async function testConnectionOnLoad() {
-  const canAccess = await testBucketAccess();
-  if (!canAccess) {
-    console.error("Failed to access GCS bucket - check credentials");
-  }
-  return canAccess;
-}
-
-export { storage, BUCKET_NAME, testBucketAccess, testConnectionOnLoad };
-
-
 
 
 
@@ -221,8 +192,22 @@ export default async function DashboardPage({
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
+  // 🧪 TEMPORARY: Test bucket access
+  console.log("Testing GCS bucket access...");
+  try {
+    const bucket = storage.bucket(BUCKET_NAME);
+    const [exists] = await bucket.exists();
+    console.log(`✅ Bucket ${BUCKET_NAME} exists:`, exists);
+  } catch (error) {
+    console.error("❌ Error accessing bucket:", error instanceof Error ? error.message : "Unknown error");
+  }
+
   // Get available symbols
   const availableSymbols = await getAvailableSymbols();
+  console.log("📊 Available symbols:", availableSymbols);
+  
+  // // Get available symbols
+  // const availableSymbols = await getAvailableSymbols();
   
   // Await searchParams and use symbol from query params or default to first available
   const params = await searchParams;
