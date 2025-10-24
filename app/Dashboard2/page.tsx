@@ -38,21 +38,34 @@ export const runtime = "nodejs";
 
 // Validate environment variables
 if (!process.env.GCP_PROJECT_ID) {
-  console.warn("GCP_PROJECT_ID environment variable is not set");
+  console.error("❌ GCP_PROJECT_ID environment variable is not set");
+  throw new Error("GCP_PROJECT_ID is required");
 }
 
 if (!process.env.GCP_CREDENTIALS) {
-  console.warn("GCP_CREDENTIALS environment variable is not set");
+  console.error("❌ GCP_CREDENTIALS environment variable is not set");
+  throw new Error("GCP_CREDENTIALS is required");
 }
 
 // Initialize Storage client
 function getGCPCredentials() {
-  return {
-    projectId: process.env.GCP_PROJECT_ID || "dfl1",
-    credentials: process.env.GCP_CREDENTIALS 
+  try {
+    const credentials = process.env.GCP_CREDENTIALS 
       ? JSON.parse(process.env.GCP_CREDENTIALS)
-      : undefined
-  };
+      : undefined;
+    
+    if (!credentials) {
+      throw new Error("GCP_CREDENTIALS must be set");
+    }
+    
+    return {
+      projectId: process.env.GCP_PROJECT_ID || "dfl-2024-a",
+      credentials
+    };
+  } catch (error) {
+    console.error("❌ Failed to parse GCP_CREDENTIALS:", error);
+    throw new Error("Invalid GCP_CREDENTIALS format. Must be valid JSON.");
+  }
 }
 
 const storageClient = new Storage(getGCPCredentials());
