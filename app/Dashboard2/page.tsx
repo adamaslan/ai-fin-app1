@@ -34,27 +34,41 @@ interface AnalysisData {
 }
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-export const runtime = "nodejs"; // must be Node.js, not Edge
+// Validate environment variables
+if (!process.env.GCP_PROJECT_ID) {
+  console.warn("GCP_PROJECT_ID environment variable is not set");
+}
 
-const storage = new Storage({
-  projectId: process.env.GCP_PROJECT_ID
-});
+if (!process.env.GCP_CREDENTIALS) {
+  console.warn("GCP_CREDENTIALS environment variable is not set");
+}
 
+// Initialize Storage client
+function getGCPCredentials() {
+  return {
+    projectId: process.env.GCP_PROJECT_ID || "dfl1",
+    credentials: process.env.GCP_CREDENTIALS 
+      ? JSON.parse(process.env.GCP_CREDENTIALS)
+      : undefined
+  };
+}
 
+const storageClient = new Storage(getGCPCredentials());
 const BUCKET_NAME = "ttb-bucket1";
 
 /**
  * Get list of all available symbols from ALL date folders
  */
 async function getAvailableSymbols(): Promise<string[]> {
-  const bucket = storage.bucket(BUCKET_NAME);
-
   try {
-    const [, , apiResponse] = await bucket.getFiles({
-      prefix: "daily/",
-      delimiter: "/",
-    });
+    const [, , apiResponse] = await storageClient
+      .bucket(BUCKET_NAME)
+      .getFiles({
+        prefix: "daily/",
+        delimiter: "/",
+      });
 
     const apiTyped = apiResponse as GetFilesApiResponse | undefined;
     const dateFolders: string[] = apiTyped?.prefixes ?? [];
@@ -67,7 +81,9 @@ async function getAvailableSymbols(): Promise<string[]> {
     const symbolSet = new Set<string>();
     
     for (const datePrefix of dateFolders) {
-      const [files] = await bucket.getFiles({ prefix: datePrefix });
+      const [files] = await storageClient
+        .bucket(BUCKET_NAME)
+        .getFiles({ prefix: datePrefix });
       
       files.forEach(file => {
         const fileName = file.name.split('/').pop() || '';
@@ -98,16 +114,17 @@ async function getAvailableSymbols(): Promise<string[]> {
  * Searches across ALL date folders to find the most recent data for the symbol.
  */
 async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResponse> {
-  const bucket = storage.bucket(BUCKET_NAME);
-
-  // 1️⃣ Get all date folders under /daily/
-  const [, , apiResponse] = await bucket.getFiles({
-    prefix: "daily/",
-    delimiter: "/",
-  });
+  // Get all date folders under /daily/
+  const [, , apiResponse] = await storageClient
+    .bucket(BUCKET_NAME)
+    .getFiles({
+      prefix: "daily/",
+      delimiter: "/",
+    });
 
   const apiTyped = apiResponse as GetFilesApiResponse | undefined;
   const dateFolders: string[] = apiTyped?.prefixes ?? [];
+  
   if (dateFolders.length === 0) {
     throw new Error("No date folders found in /daily/");
   }
@@ -115,9 +132,11 @@ async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResp
   // Sort date folders in descending order (newest first)
   const sortedDateFolders = dateFolders.sort().reverse();
 
-  // 2️⃣ Search through date folders starting with the most recent
+  // Search through date folders starting with the most recent
   for (const datePrefix of sortedDateFolders) {
-    const [files] = await bucket.getFiles({ prefix: datePrefix });
+    const [files] = await storageClient
+      .bucket(BUCKET_NAME)
+      .getFiles({ prefix: datePrefix });
     
     const signalsFile = files
       .filter(
@@ -143,14 +162,16 @@ async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResp
 
       let technicalData: Record<string, unknown> | null = null;
       if (signalsFile) {
-        const [signalsContent] = await signalsFile.download();
-        technicalData = JSON.parse(signalsContent.toString()) as Record<string, unknown>;
+        const file = storageClient.bucket(BUCKET_NAME).file(signalsFile.name);
+        const [data] = await file.download();
+        technicalData = JSON.parse(data.toString()) as Record<string, unknown>;
       }
 
       let geminiAnalysis: Record<string, unknown> | null = null;
       if (geminiFile) {
-        const [geminiContent] = await geminiFile.download();
-        geminiAnalysis = JSON.parse(geminiContent.toString()) as Record<string, unknown>;
+        const file = storageClient.bucket(BUCKET_NAME).file(geminiFile.name);
+        const [data] = await file.download();
+        geminiAnalysis = JSON.parse(data.toString()) as Record<string, unknown>;
       }
 
       return { technicalData, geminiAnalysis, date: latestDate };
@@ -171,8 +192,18 @@ export default async function DashboardPage({
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
+  // Test bucket access
+  console.log("Testing GCS bucket access...");
+  try {
+    const [exists] = await storageClient.bucket(BUCKET_NAME).exists();
+    console.log(`✅ Bucket ${BUCKET_NAME} exists:`, exists);
+  } catch (error) {
+    console.error("❌ Error accessing bucket:", error instanceof Error ? error.message : "Unknown error");
+  }
+
   // Get available symbols
   const availableSymbols = await getAvailableSymbols();
+  console.log("📊 Available symbols:", availableSymbols);
   
   // Await searchParams and use symbol from query params or default to first available
   const params = await searchParams;
