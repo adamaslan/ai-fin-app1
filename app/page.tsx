@@ -1,93 +1,88 @@
 import Image from "next/image";
-// import SpreadSuggestionsServer from "./(components)/Spread1";
 import Link from "next/link";
-// import Nav from "./components/Navbar/page";
 
 export default function Home() {
   return (
-    <>
-      {/* Navbar (client) */}
-      {/* <Nav /> */}
+    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-black text-white">
+      <div className="container mx-auto px-6 py-20">
+        <div className="max-w-3xl mx-auto text-center">
+          {/* <div className="inline-block mb-6 p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10">
+            <Image src="/next.svg" alt="AI Fin" width={120} height={28} priority />
+          </div> */}
 
-      {/* Background gradient layers (don’t block clicks) */}
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse animation-delay-2000"></div>
-        </div>
+          <h1 className="text-4xl sm:text-5xl font-extrabold mb-4">ORCL — Technical Snapshot</h1>
+          <p className="text-lg text-white/70 mb-6">Concise, data-driven signals to act faster. Log in to access live charts, trade-ready signals, and option strategies.</p>
 
-        {/* Main content */}
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
-          {/* Hero section */}
-          <div className="text-center space-y-8 max-w-4xl mb-12">
-            {/* Logo */}
-            <div className="inline-block bg-black/30 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-              <Image
-                className="dark:invert"
-                src="/next.svg"
-                alt="Stock Dashboard"
-                width={100}
-                height={20}
-                priority
-              />
-            </div>
-
-            {/* Heading */}
-            <div className="space-y-4">
-              <h1 className="text-5xl sm:text-7xl font-black tracking-tight">
-                <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Stock Dashboard
-                </span>
-              </h1>
-              <p className="text-xl sm:text-2xl text-white/70 font-light max-w-2xl mx-auto">
-                Real-time technical analysis with AI-powered option strategies
-              </p>
-            </div>
-
-            {/* Quick features */}
-            <div className="flex flex-wrap justify-center gap-4 text-sm text-white/60">
-              <span className="px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm">
-                📊 Live Technical Indicators
-              </span>
-              <span className="px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm">
-                🎯 Smart Option Spreads
-              </span>
-              <span className="px-3 py-1 bg-white/10 rounded-full backdrop-blur-sm">
-                ⚡ Real-time Updates
-              </span>
-            </div>
-          </div>
-
-          {/* Dashboard Section */}
-          <div
-            id="dashboard"
-            className="relative z-10 min-h-screen bg-gradient-to-b from-transparent to-slate-900/50 w-full"
-          >
-            <div className="container mx-auto px-4 py-12">
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-white mb-4">
-                  Live Dashboard
-                </h2>
-                <p className="text-white/60">
-                 Login for stock analysis and option strategies
-                </p>
-
-                {/* Link to DataPage1 */}
-                <Link href="/DataPage1">
-                  <button className="bg-blue-500 text-white px-4 py-2 rounded-md mt-4 hover:bg-blue-600">
-                    View in AG Grid
-                  </button>
-                </Link>
+          {/* Snapshot card */}
+          <section className="bg-white/5 rounded-2xl p-6 text-left shadow-lg border border-white/10">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <div className="text-sm text-white/60">Signal count</div>
+                <div className="text-2xl font-bold">12</div>
               </div>
-
-              {/* Dashboard container */}
-              <div className="animate-fade-in-up bg-white/5 text-white/60 backdrop-blur-sm rounded-3xl border border-white/10 overflow-hidden transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:border-green-500/30">
-                {/* <SpreadSuggestionsServer /> */}
+              <div className="text-right">
+                <div className="text-sm text-white/60">Timestamp</div>
+                <div className="text-sm">20251023_170132</div>
               </div>
             </div>
+
+            <div className="mt-4">
+              <h3 className="text-xl font-semibold">Strongest Signal</h3>
+              <p className="text-white/70">MA ALIGNMENT BULLISH — 10 &gt; 20 &gt; 50 SMA (note: extended from 200 SMA)</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+              <div className="p-3 bg-white/3 rounded-lg">
+                <div className="text-sm text-white/60">Overall Bias</div>
+                <div className="font-semibold">Neutral → Slight Bullish</div>
+                <div className="text-xs text-white/60 mt-1">Confidence: 6/10</div>
+              </div>
+
+              <div className="p-3 bg-white/3 rounded-lg">
+                <div className="text-sm text-white/60">Key Levels</div>
+                <div className="font-semibold">Resistance: $280.07 • $285–$290</div>
+                <div className="text-xs text-white/60 mt-1">Support: 20 SMA ≈ $271.46 • 50 SMA ≈ $273.61 • 200 SMA ≈ $201.65</div>
+              </div>
+
+              <div className="p-3 bg-white/3 rounded-lg">
+                <div className="text-sm text-white/60">Risk</div>
+                <div className="font-semibold">High — Extended from 200 SMA</div>
+                <div className="text-xs text-white/60 mt-1">Volatility ~47% • ADX 15.6 (weak trend)</div>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <h4 className="font-semibold">Trading Recommendation</h4>
+              <ul className="list-disc list-inside text-white/70 mt-2">
+                <li>Wait for confirmed breakout above resistance for a small long entry (entry ~ $282; SL below 20-day SMA).</li>
+                <li>Alternatively, consider short if price breaks below 20-day SMA (entry ~ $270; tight stop above 20-day SMA).</li>
+                <li>Always confirm with volume & broader market context.</li>
+              </ul>
+            </div>
+
+            <p className="text-xs text-white/50 mt-4">This summary is a preview — full, interactive analysis and trade tools are available after logging in.</p>
+          </section>
+
+          {/* CTA */}
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/login"
+              className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-lg"
+            >
+              Log in to view full analysis
+            </Link>
+
+            <Link
+              href="/signup"
+              className="inline-block border border-white/20 text-white/90 px-6 py-3 rounded-lg"
+            >
+              Create an account
+            </Link>
           </div>
+
+          <p className="text-xs text-white/50 mt-6">Not financial advice. Data shown is a snapshot — log in for live updates, charts, and trade-ready option strategies.</p>
         </div>
       </div>
-    </>
+    </main>
   );
 }
