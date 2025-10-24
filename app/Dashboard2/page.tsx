@@ -2,6 +2,8 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Storage } from "@google-cloud/storage";
 
+
+
 interface TechnicalDataResponse {
   technicalData: Record<string, unknown> | null;
   geminiAnalysis: Record<string, unknown> | null;
@@ -38,9 +40,11 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs"; // must be Node.js, not Edge
 
 const storage = new Storage({
-  projectId: process.env.GCP_PROJECT_ID
+  projectId: process.env.GCP_PROJECT_ID || "dfl1",
+  credentials: process.env.GCP_CREDENTIALS 
+    ? JSON.parse(process.env.GCP_CREDENTIALS)
+    : undefined
 });
-
 
 const BUCKET_NAME = "ttb-bucket1";
 
