@@ -77,6 +77,12 @@ export default function Home() {
               className="inline-block border border-white/20 text-white/90 px-6 py-3 rounded-lg"
             >
               Create an account
+            </Link> 
+              <Link
+              href="/Dashboard2"
+              className="inline-block bg-pink-600 hover:bg-indigo-700 text-white font-semibold px-6 py-3 rounded-lg"
+           >
+              Checkout the Fancy Dashboard
             </Link>
           </div>
 
