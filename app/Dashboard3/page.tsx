@@ -629,3 +629,81 @@ export default async function DashboardPage({
                   ) : (
                     <div className="col-span-8 text-gray-400 text-sm text-center">No oscillator data available</div>
                   )}
+                </div>
+              </div>
+
+              {/* Analysis Text (if available) */}
+              {analysisData.analysis && (
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Analysis Summary</h3>
+                  <MarkdownAnalysis text={analysisData.analysis} />
+                </div>
+              )}
+
+              {/* Risk & Key Levels */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-800 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-300">Risk Factors</h4>
+                  <ul className="mt-2 text-sm text-gray-200 space-y-1 list-disc list-inside">
+                    {Array.isArray(analysisData?.risk) ? (
+                      (analysisData!.risk as string[]).map((r: string, i: number) => (
+                        <li key={i}>{r}</li>
+                      ))
+                    ) : (
+                      <>
+                        <li>High volatility — see analysis</li>
+                        <li>Signals may be noisy</li>
+                        <li>Confirm before trading</li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+
+                <div className="p-4 bg-gray-800 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-300">Key Levels</h4>
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    {Array.isArray(analysisData?.key_levels) ? (
+                      (analysisData!.key_levels as string[]).map((k: string, i: number) => (
+                        <div key={i} className="bg-gray-700 px-3 py-1 rounded-md">{k}</div>
+                      ))
+                    ) : (
+                      <>
+                        <div className="bg-gray-700 px-3 py-1 rounded-md">Support 1</div>
+                        <div className="bg-gray-700 px-3 py-1 rounded-md">Support 2</div>
+                        <div className="bg-gray-700 px-3 py-1 rounded-md">Resistance 1</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section className="mt-8">
+          <h3 className="text-xl font-semibold mb-4">All Signals ({analysisData.signals?.length ?? 0})</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.isArray(analysisData.signals) ? (
+              (analysisData.signals as AnalysisSignal[]).map((s, idx) => (
+                <div key={idx} className="p-3 bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg border border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold">{s.signal}</div>
+                      <div className="text-sm text-gray-300">{s.desc}</div>
+                    </div>
+                    <div className="ml-3">
+                      <StrengthBadge strength={s.strength} />
+                    </div>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-2">{s.category}</div>
+                </div>
+              ))
+            ) : (
+              <div className="text-gray-400">No signals array found in analysis JSON.</div>
+            )}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
