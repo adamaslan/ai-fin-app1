@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Storage } from "@google-cloud/storage";
+import fs from "fs";
 
 interface TechnicalDataResponse {
   technicalData: Record<string, unknown> | null;
@@ -66,29 +67,43 @@ if (!process.env.GCP_PROJECT_ID) {
   throw new Error("GCP_PROJECT_ID is required");
 }
 
-if (!process.env.GCP_CREDENTIALS) {
-  console.error("❌ GCP_CREDENTIALS environment variable is not set");
-  throw new Error("GCP_CREDENTIALS is required");
+if (!process.env.GCP_CREDENTIALS && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  console.error("❌ GCP_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS environment variable is not set");
+  throw new Error("GCP_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS is required");
 }
 
 // Initialize Storage client
 function getGCPCredentials() {
   try {
-    const credentials = process.env.GCP_CREDENTIALS 
-      ? JSON.parse(process.env.GCP_CREDENTIALS)
-      : undefined;
-    
-    if (!credentials) {
-      throw new Error("GCP_CREDENTIALS must be set");
+    // Accept either:
+    // - GCP_CREDENTIALS as a JSON string
+    // - GOOGLE_APPLICATION_CREDENTIALS as a path to a service-account JSON file
+    const raw = process.env.GCP_CREDENTIALS ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (!raw) {
+      throw new Error("No GCP credentials provided via env vars");
     }
-    
+
+  let credentials: Record<string, unknown> | undefined;
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("{")) {
+      // JSON string
+      credentials = JSON.parse(trimmed);
+    } else {
+      // Treat as path to JSON file
+      const filePath = raw;
+      const fileContents = fs.readFileSync(filePath, "utf8");
+      credentials = JSON.parse(fileContents);
+    }
+
     return {
       projectId: process.env.GCP_PROJECT_ID || "dfl-2024-a",
-      credentials
+      credentials,
     };
   } catch (error) {
-    console.error("❌ Failed to parse GCP_CREDENTIALS:", error);
-    throw new Error("Invalid GCP_CREDENTIALS format. Must be valid JSON.");
+    console.error("❌ Failed to load GCP credentials:", error);
+    throw new Error(
+      "Invalid or unreadable GCP credentials. Provide GCP_CREDENTIALS (JSON string) or GOOGLE_APPLICATION_CREDENTIALS (path to service-account JSON)."
+    );
   }
 }
 
@@ -429,19 +444,27 @@ export default async function DashboardPage({
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400">Price:</span>
-                      <span className="text-white text-lg font-semibold">${analysisData.price?.toFixed(2) ?? "N/A"}</span>
+                      <span className="text-white text-lg font-semibold">
+                        ${analysisData.price !== undefined && analysisData.price !== null ? analysisData.price.toFixed(2) : "N/A"}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400">Change:</span>
                       <span className={`font-semibold ${
                         (analysisData.change_pct ?? 0) < 0 ? 'text-red-400' : 'text-green-400'
                       }`}>
-                        {analysisData.change_pct !== undefined ? `${analysisData.change_pct > 0 ? '+' : ''}${analysisData.change_pct.toFixed(2)}%` : "N/A"}
+                        {analysisData.change_pct !== undefined && analysisData.change_pct !== null 
+                          ? `${analysisData.change_pct > 0 ? '+' : ''}${analysisData.change_pct.toFixed(2)}%` 
+                          : "N/A"}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400">Volume:</span>
-                      <span className="text-white font-mono text-sm">{analysisData.volume?.toLocaleString() ?? "N/A"}</span>
+                      <span className="text-white font-mono text-sm">
+                        {analysisData.volume !== undefined && analysisData.volume !== null 
+                          ? analysisData.volume.toLocaleString() 
+                          : "N/A"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -631,77 +654,44 @@ export default async function DashboardPage({
                   )}
                 </div>
               </div>
-
-              {/* Analysis Text (if available) */}
-              {analysisData.analysis && (
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Analysis Summary</h3>
-                  <MarkdownAnalysis text={analysisData.analysis} />
-                </div>
-              )}
-
-              {/* Risk & Key Levels */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-800 rounded-lg">
-                  <h4 className="text-sm font-semibold text-gray-300">Risk Factors</h4>
-                  <ul className="mt-2 text-sm text-gray-200 space-y-1 list-disc list-inside">
-                    {Array.isArray(analysisData?.risk) ? (
-                      (analysisData!.risk as string[]).map((r: string, i: number) => (
-                        <li key={i}>{r}</li>
-                      ))
-                    ) : (
-                      <>
-                        <li>High volatility — see analysis</li>
-                        <li>Signals may be noisy</li>
-                        <li>Confirm before trading</li>
-                      </>
-                    )}
-                  </ul>
-                </div>
-
-                <div className="p-4 bg-gray-800 rounded-lg">
-                  <h4 className="text-sm font-semibold text-gray-300">Key Levels</h4>
-                  <div className="mt-2 flex flex-wrap gap-3">
-                    {Array.isArray(analysisData?.key_levels) ? (
-                      (analysisData!.key_levels as string[]).map((k: string, i: number) => (
-                        <div key={i} className="bg-gray-700 px-3 py-1 rounded-md">{k}</div>
-                      ))
-                    ) : (
-                      <>
-                        <div className="bg-gray-700 px-3 py-1 rounded-md">Support 1</div>
-                        <div className="bg-gray-700 px-3 py-1 rounded-md">Support 2</div>
-                        <div className="bg-gray-700 px-3 py-1 rounded-md">Resistance 1</div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
             </div>
           </section>
         </div>
 
         <section className="mt-8">
-          <h3 className="text-xl font-semibold mb-4">All Signals ({analysisData.signals?.length ?? 0})</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {Array.isArray(analysisData.signals) ? (
+          <h3 className="text-xl font-semibold mb-4">Signals Analyzed ({analysisData.signals?.length ?? 0})</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {Array.isArray(analysisData.signals) && analysisData.signals.length > 0 ? (
               (analysisData.signals as AnalysisSignal[]).map((s, idx) => (
-                <div key={idx} className="p-3 bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg border border-gray-700">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold">{s.signal}</div>
-                      <div className="text-sm text-gray-300">{s.desc}</div>
+                <div key={idx} className="p-3 bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg border border-gray-700 hover:border-gray-600 transition-all">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-white truncate">{s.signal}</div>
+                      <div className="text-sm text-gray-300 mt-1">{s.desc}</div>
                     </div>
-                    <div className="ml-3">
+                    <div className="flex-shrink-0">
                       <StrengthBadge strength={s.strength} />
                     </div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-2">{s.category}</div>
+                  <div className="text-xs text-gray-400 mt-2 uppercase tracking-wide">{s.category}</div>
                 </div>
               ))
             ) : (
-              <div className="text-gray-400">No signals array found in analysis JSON.</div>
+              <div className="text-gray-400 col-span-full text-center py-8">No signals found in analysis data.</div>
             )}
           </div>
+        </section>
+        
+        {/* AI-generated narrative / analysis text (rendered with lightweight markdown) */}
+        <section className="mt-8">
+          <h3 className="text-xl font-semibold mb-4">AI Narrative</h3>
+          {analysisData.analysis ? (
+            <div className="p-4 bg-gray-800 rounded-lg">
+              <MarkdownAnalysis text={analysisData.analysis} />
+            </div>
+          ) : (
+            <p className="text-gray-400">No analysis text provided.</p>
+          )}
         </section>
       </div>
     </main>
