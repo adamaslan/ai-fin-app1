@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Storage } from "@google-cloud/storage";
+import fs from "fs";
 
 interface TechnicalDataResponse {
   technicalData: Record<string, unknown> | null;
@@ -66,29 +67,43 @@ if (!process.env.GCP_PROJECT_ID) {
   throw new Error("GCP_PROJECT_ID is required");
 }
 
-if (!process.env.GCP_CREDENTIALS) {
-  console.error("❌ GCP_CREDENTIALS environment variable is not set");
-  throw new Error("GCP_CREDENTIALS is required");
+if (!process.env.GCP_CREDENTIALS && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  console.error("❌ GCP_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS environment variable is not set");
+  throw new Error("GCP_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS is required");
 }
 
 // Initialize Storage client
 function getGCPCredentials() {
   try {
-    const credentials = process.env.GCP_CREDENTIALS 
-      ? JSON.parse(process.env.GCP_CREDENTIALS)
-      : undefined;
-    
-    if (!credentials) {
-      throw new Error("GCP_CREDENTIALS must be set");
+    // Accept either:
+    // - GCP_CREDENTIALS as a JSON string
+    // - GOOGLE_APPLICATION_CREDENTIALS as a path to a service-account JSON file
+    const raw = process.env.GCP_CREDENTIALS ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (!raw) {
+      throw new Error("No GCP credentials provided via env vars");
     }
-    
+
+    let credentials: any;
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("{")) {
+      // JSON string
+      credentials = JSON.parse(trimmed);
+    } else {
+      // Treat as path to JSON file
+      const filePath = raw;
+      const fileContents = fs.readFileSync(filePath, "utf8");
+      credentials = JSON.parse(fileContents);
+    }
+
     return {
       projectId: process.env.GCP_PROJECT_ID || "dfl-2024-a",
-      credentials
+      credentials,
     };
   } catch (error) {
-    console.error("❌ Failed to parse GCP_CREDENTIALS:", error);
-    throw new Error("Invalid GCP_CREDENTIALS format. Must be valid JSON.");
+    console.error("❌ Failed to load GCP credentials:", error);
+    throw new Error(
+      "Invalid or unreadable GCP credentials. Provide GCP_CREDENTIALS (JSON string) or GOOGLE_APPLICATION_CREDENTIALS (path to service-account JSON)."
+    );
   }
 }
 
@@ -665,6 +680,18 @@ export default async function DashboardPage({
               <div className="text-gray-400 col-span-full text-center py-8">No signals found in analysis data.</div>
             )}
           </div>
+        </section>
+        
+        {/* AI-generated narrative / analysis text (rendered with lightweight markdown) */}
+        <section className="mt-8">
+          <h3 className="text-xl font-semibold mb-4">AI Narrative</h3>
+          {analysisData.analysis ? (
+            <div className="p-4 bg-gray-800 rounded-lg">
+              <MarkdownAnalysis text={analysisData.analysis} />
+            </div>
+          ) : (
+            <p className="text-gray-400">No analysis text provided.</p>
+          )}
         </section>
       </div>
     </main>

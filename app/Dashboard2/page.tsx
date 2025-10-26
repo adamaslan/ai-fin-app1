@@ -397,15 +397,15 @@ export default async function DashboardPage({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-800 rounded-lg">
+                {/* <div className="p-4 bg-gray-800 rounded-lg">
                   <h4 className="text-sm font-semibold text-gray-300">Overall Bias</h4>
                   <p className="mt-2 text-white">{analysisData.overall_bias ?? "N/A"}</p>
                   <p className="text-sm text-gray-400 mt-1">{analysisData.long_term_comment ?? ""}</p>
-                </div>
+                </div> */}
 
                 <div className="p-4 bg-gray-800 rounded-lg">
-                  <h4 className="text-sm font-semibold text-gray-300">Risk</h4>
-                  <ul className="mt-2 text-sm text-gray-200 space-y-1 list-disc list-inside">
+                  <h4 className="text-sm font-semibold text-gray-300">Contact Us With Any Questions or Suggestions</h4>
+                  {/* <ul className="mt-2 text-sm text-gray-200 space-y-1 list-disc list-inside">
                     {Array.isArray(analysisData?.risk) ? (
                       (analysisData!.risk as string[]).map((r: string, i: number) => (
                         <li key={i}>{r}</li>
@@ -417,11 +417,11 @@ export default async function DashboardPage({
                         <li>Confirm before trading</li>
                       </>
                     )}
-                  </ul>
+                  </ul> */}
                 </div>
               </div>
 
-              <div className="p-4 bg-gray-800 rounded-lg">
+              {/* <div className="p-4 bg-gray-800 rounded-lg">
                 <h4 className="text-sm font-semibold text-gray-300">Key Levels</h4>
                 <div className="mt-2 flex flex-wrap gap-3">
                   {Array.isArray(analysisData?.key_levels) ? (
@@ -436,12 +436,12 @@ export default async function DashboardPage({
                     </>
                   )}
                 </div>
-              </div>
+              </div> */}
 
-              <div>
+              {/* <div>
                 <h4 className="text-sm font-semibold text-gray-300">Recommendation</h4>
                 <p className="mt-2 text-white">{analysisData?.recommendation ?? "No recommendation provided."}</p>
-              </div>
+              </div> */}
             </div>
           </section>
         </div>
