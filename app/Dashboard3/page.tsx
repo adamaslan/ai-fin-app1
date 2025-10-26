@@ -83,7 +83,7 @@ function getGCPCredentials() {
       throw new Error("No GCP credentials provided via env vars");
     }
 
-    let credentials: any;
+  let credentials: Record<string, unknown> | undefined;
     const trimmed = raw.trim();
     if (trimmed.startsWith("{")) {
       // JSON string
