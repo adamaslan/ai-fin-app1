@@ -1,7 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Storage } from "@google-cloud/storage";
-import fs from "fs";
 
 interface TechnicalDataResponse {
   technicalData: Record<string, unknown> | null;
@@ -20,42 +19,18 @@ interface AnalysisSignal {
   category: string;
 }
 
-interface Indicators {
-  RSI: number;
-  MACD: number;
-  ADX: number;
-  Stochastic: number;
-  CCI: number;
-  MFI: number;
-  BB_Position: number;
-  Volatility: number;
-}
-
-interface MovingAverages {
-  SMA_10: number;
-  SMA_20: number;
-  SMA_50: number;
-  SMA_200: number;
-  EMA_10: number;
-  EMA_20: number;
-}
-
 interface AnalysisData {
   symbol: string;
   timestamp: string;
   date: string;
-  price: number;
-  change_pct: number;
-  volume: number;
-  indicators: Indicators;
-  moving_averages: MovingAverages;
-  signals: AnalysisSignal[];
+  analysis: string;
   signal_count: number;
-  bullish_count: number;
-  bearish_count: number;
-  analysis?: string;
+  signals_analyzed: AnalysisSignal[];
+  overall_bias?: string;
+  long_term_comment?: string;
   risk?: string[];
   key_levels?: string[];
+  recommendation?: string;
 }
 
 export const dynamic = "force-dynamic";
@@ -67,43 +42,29 @@ if (!process.env.GCP_PROJECT_ID) {
   throw new Error("GCP_PROJECT_ID is required");
 }
 
-if (!process.env.GCP_CREDENTIALS && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  console.error("❌ GCP_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS environment variable is not set");
-  throw new Error("GCP_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS is required");
+if (!process.env.GCP_CREDENTIALS) {
+  console.error("❌ GCP_CREDENTIALS environment variable is not set");
+  throw new Error("GCP_CREDENTIALS is required");
 }
 
 // Initialize Storage client
 function getGCPCredentials() {
   try {
-    // Accept either:
-    // - GCP_CREDENTIALS as a JSON string
-    // - GOOGLE_APPLICATION_CREDENTIALS as a path to a service-account JSON file
-    const raw = process.env.GCP_CREDENTIALS ?? process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    if (!raw) {
-      throw new Error("No GCP credentials provided via env vars");
+    const credentials = process.env.GCP_CREDENTIALS 
+      ? JSON.parse(process.env.GCP_CREDENTIALS)
+      : undefined;
+    
+    if (!credentials) {
+      throw new Error("GCP_CREDENTIALS must be set");
     }
-
-  let credentials: Record<string, unknown> | undefined;
-    const trimmed = raw.trim();
-    if (trimmed.startsWith("{")) {
-      // JSON string
-      credentials = JSON.parse(trimmed);
-    } else {
-      // Treat as path to JSON file
-      const filePath = raw;
-      const fileContents = fs.readFileSync(filePath, "utf8");
-      credentials = JSON.parse(fileContents);
-    }
-
+    
     return {
       projectId: process.env.GCP_PROJECT_ID || "dfl-2024-a",
-      credentials,
+      credentials
     };
   } catch (error) {
-    console.error("❌ Failed to load GCP credentials:", error);
-    throw new Error(
-      "Invalid or unreadable GCP credentials. Provide GCP_CREDENTIALS (JSON string) or GOOGLE_APPLICATION_CREDENTIALS (path to service-account JSON)."
-    );
+    console.error("❌ Failed to parse GCP_CREDENTIALS:", error);
+    throw new Error("Invalid GCP_CREDENTIALS format. Must be valid JSON.");
   }
 }
 
@@ -140,16 +101,16 @@ async function getAvailableSymbols(): Promise<string[]> {
       files.forEach(file => {
         const fileName = file.name.split('/').pop() || '';
         
-        // Match signals_SYMBOL_ pattern (case-insensitive)
-        const signalsMatch = fileName.match(/signals_([A-Z]+)_/i);
+        // Match signals_SYMBOL_ pattern
+        const signalsMatch = fileName.match(/signals_([A-Z]+)_/);
         if (signalsMatch) {
-          symbolSet.add(signalsMatch[1].toUpperCase());
+          symbolSet.add(signalsMatch[1]);
         }
         
-        // Match SYMBOL_gemini_analysis pattern (case-insensitive)
-        const geminiMatch = fileName.match(/([A-Z]+)_gemini_analysis_/i);
+        // Match SYMBOL_gemini_analysis pattern
+        const geminiMatch = fileName.match(/([A-Z]+)_gemini_analysis_/);
         if (geminiMatch) {
-          symbolSet.add(geminiMatch[1].toUpperCase());
+          symbolSet.add(geminiMatch[1]);
         }
       });
     }
@@ -193,7 +154,7 @@ async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResp
     const signalsFile = files
       .filter(
         (f) =>
-          f.name.toLowerCase().includes(`signals_${symbol.toLowerCase()}`) &&
+          f.name.includes(`signals_${symbol}`) &&
           f.name.endsWith(".json")
       )
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -202,7 +163,7 @@ async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResp
     const geminiFile = files
       .filter(
         (f) =>
-          f.name.toLowerCase().includes(`${symbol.toLowerCase()}_gemini_analysis_`) &&
+          f.name.includes(`${symbol}_gemini_analysis_`) &&
           f.name.endsWith(".json")
       )
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -273,6 +234,17 @@ export default async function DashboardPage({
     ? (fetched.geminiAnalysis ?? fetched.technicalData) as unknown as AnalysisData
     : null;
 
+  // Get technical data for indicators
+  const technicalData = fetched?.technicalData as unknown as {
+    price?: number;
+    change_pct?: number;
+    volume?: number;
+    indicators?: Record<string, number>;
+    moving_averages?: Record<string, number>;
+    bullish_count?: number;
+    bearish_count?: number;
+  } | null;
+
   function StrengthBadge({ strength }: { strength: string }) {
     const base = "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium";
     const color =
@@ -280,10 +252,8 @@ export default async function DashboardPage({
         ? "bg-red-600 text-red-100"
         : strength.includes("BULL") || strength.includes("BULLISH")
         ? "bg-green-600 text-green-100"
-        : strength.includes("EXTREME") || strength.includes("HIGH RISK") || strength.includes("CAUTION") || strength.includes("OVERBOUGHT") || strength.includes("OVERSOLD")
+        : strength.includes("EXTREME") || strength.includes("HIGH RISK")
         ? "bg-yellow-600 text-yellow-100"
-        : strength.includes("TRENDING")
-        ? "bg-blue-600 text-blue-100"
         : "bg-gray-600 text-gray-100";
 
     return <span className={`${base} ${color}`}>{strength}</span>;
@@ -346,25 +316,25 @@ export default async function DashboardPage({
   if (!analysisData) {
     return (
       <main className="min-h-screen bg-gray-900 text-white">
-        <div className="container mx-auto py-10 px-4">
-          <header className="mb-6">
-            <div className="mb-4">
+        <div className="container mx-auto py-10">
+          <header className="mb-6 flex items-center justify-between">
+            <div>
               <h1 className="text-4xl font-bold">Welcome, {user.firstName || "User"}</h1>
               <p className="text-gray-400 mt-2">Technical Analysis Dashboard</p>
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-gray-300">
+            <div className="flex items-center gap-3">
+              <label htmlFor="stock-select" className="text-sm font-medium text-gray-300">
                 Select Stock:
               </label>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {availableSymbols.map((sym) => (
                   <a
                     key={sym}
                     href={`/Dashboard2?symbol=${sym}`}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all text-center ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       sym === symbol
-                        ? "bg-blue-600 text-white shadow-lg scale-105"
-                        : "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700 hover:scale-102"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700"
                     }`}
                   >
                     {sym}
@@ -386,27 +356,25 @@ export default async function DashboardPage({
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
-      <div className="container mx-auto py-10 px-4">
-        <header className="mb-6">
-          <div className="mb-4">
+      <div className="container mx-auto py-10">
+        <header className="mb-6 flex items-center justify-between">
+          <div>
             <h1 className="text-4xl font-bold">Welcome, {user.firstName || "User"}</h1>
             <p className="text-gray-400 mt-2">{analysisData.symbol ?? symbol} Analysis</p>
           </div>
-          
-          {/* Mobile-responsive stock selector */}
-          <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-3">
             <label className="text-sm font-medium text-gray-300">
               Select Stock:
             </label>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
+            <div className="flex gap-2 flex-wrap">
               {availableSymbols.map((sym) => (
                 <a
                   key={sym}
                   href={`/Dashboard2?symbol=${sym}`}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all text-center ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     sym === symbol
-                      ? "bg-blue-600 text-white shadow-lg scale-105"
-                      : "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700 hover:scale-102"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700"
                   }`}
                 >
                   {sym}
@@ -416,14 +384,121 @@ export default async function DashboardPage({
           </div>
         </header>
 
+        {/* Price & Indicators Overview */}
+        {technicalData && (
+          <section className="mb-6">
+            {/* Hero Price Card */}
+            <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 p-8 rounded-2xl shadow-2xl border border-blue-700/50 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Current Price */}
+                <div className="text-center md:text-left">
+                  <div className="text-sm text-blue-200 uppercase tracking-wide mb-2">Current Price</div>
+                  <div className="text-5xl font-bold text-white mb-2">
+                    ${technicalData.price?.toFixed(2) || 'N/A'}
+                  </div>
+                  <div className={`text-2xl font-semibold ${(technicalData.change_pct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {(technicalData.change_pct ?? 0) >= 0 ? '↑' : '↓'} {Math.abs(technicalData.change_pct ?? 0).toFixed(2)}%
+                  </div>
+                </div>
+
+                {/* Volume */}
+                <div className="text-center">
+                  <div className="text-sm text-blue-200 uppercase tracking-wide mb-2">Volume</div>
+                  <div className="text-3xl font-bold text-white mb-2">
+                    {(technicalData.volume ?? 0).toLocaleString()}
+                  </div>
+                  <div className="text-sm text-blue-300">shares traded</div>
+                </div>
+
+                {/* Signal Summary */}
+                <div className="text-center md:text-right">
+                  <div className="text-sm text-blue-200 uppercase tracking-wide mb-2">Signal Summary</div>
+                  <div className="flex justify-center md:justify-end gap-4 mb-2">
+                    <div className="bg-green-500/20 px-4 py-2 rounded-lg border border-green-500/50">
+                      <div className="text-2xl font-bold text-green-400">{technicalData.bullish_count ?? 0}</div>
+                      <div className="text-xs text-green-300">Bullish</div>
+                    </div>
+                    <div className="bg-red-500/20 px-4 py-2 rounded-lg border border-red-500/50">
+                      <div className="text-2xl font-bold text-red-400">{technicalData.bearish_count ?? 0}</div>
+                      <div className="text-xs text-red-300">Bearish</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Technical Indicators Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {technicalData.indicators && Object.entries(technicalData.indicators).map(([key, value]) => {
+                let color = 'from-gray-800 to-gray-700';
+                let textColor = 'text-gray-200';
+                let borderColor = 'border-gray-600';
+                
+                // Color coding based on indicator values
+                if (key === 'RSI') {
+                  if (value > 70) { color = 'from-red-900 to-red-800'; textColor = 'text-red-200'; borderColor = 'border-red-700'; }
+                  else if (value < 30) { color = 'from-green-900 to-green-800'; textColor = 'text-green-200'; borderColor = 'border-green-700'; }
+                  else { color = 'from-blue-900 to-blue-800'; textColor = 'text-blue-200'; borderColor = 'border-blue-700'; }
+                } else if (key === 'MACD') {
+                  color = value > 0 ? 'from-green-900 to-green-800' : 'from-red-900 to-red-800';
+                  textColor = value > 0 ? 'text-green-200' : 'text-red-200';
+                  borderColor = value > 0 ? 'border-green-700' : 'border-red-700';
+                } else if (key === 'Stochastic') {
+                  if (value > 80) { color = 'from-red-900 to-red-800'; textColor = 'text-red-200'; borderColor = 'border-red-700'; }
+                  else if (value < 20) { color = 'from-green-900 to-green-800'; textColor = 'text-green-200'; borderColor = 'border-green-700'; }
+                  else { color = 'from-blue-900 to-blue-800'; textColor = 'text-blue-200'; borderColor = 'border-blue-700'; }
+                } else if (key === 'ADX') {
+                  if (value > 25) { color = 'from-purple-900 to-purple-800'; textColor = 'text-purple-200'; borderColor = 'border-purple-700'; }
+                  else { color = 'from-gray-800 to-gray-700'; textColor = 'text-gray-200'; borderColor = 'border-gray-600'; }
+                }
+
+                return (
+                  <div key={key} className={`bg-gradient-to-br ${color} p-4 rounded-xl shadow-lg border ${borderColor}`}>
+                    <div className="text-xs uppercase tracking-wider text-gray-300 mb-1">{key}</div>
+                    <div className={`text-2xl font-bold ${textColor}`}>
+                      {typeof value === 'number' ? value.toFixed(2) : value}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Moving Averages */}
+            {technicalData.moving_averages && (
+              <div className="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-900 p-6 rounded-xl shadow-lg border border-indigo-700/50">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <span className="text-2xl">📊</span>
+                  Moving Averages
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {Object.entries(technicalData.moving_averages).map(([key, value]) => {
+                    const currentPrice = technicalData.price ?? 0;
+                    const isAbove = currentPrice > value;
+                    
+                    return (
+                      <div key={key} className="bg-white/5 backdrop-blur-sm p-3 rounded-lg border border-white/10">
+                        <div className="text-xs text-indigo-200 uppercase tracking-wide mb-1">{key.replace('_', ' ')}</div>
+                        <div className="text-xl font-bold text-white mb-1">
+                          ${typeof value === 'number' ? value.toFixed(2) : value}
+                        </div>
+                        <div className={`text-xs font-medium ${isAbove ? 'text-green-400' : 'text-red-400'}`}>
+                          {isAbove ? '↑ Above' : '↓ Below'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
         <div className="grid grid-cols-1 gap-6">
           <section className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
-            <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-2xl font-semibold">{analysisData.symbol ?? symbol} — Technical Snapshot</h2>
-                <p className="text-sm text-gray-300 mt-1">
-                  {analysisData.signal_count} signals • {analysisData.bullish_count} bullish • {analysisData.bearish_count} bearish
-                </p>
+                <p className="text-sm text-gray-300 mt-1">Signal count: {analysisData.signal_count}</p>
               </div>
               <div className="text-right">
                 <div className="text-xs text-gray-400">Timestamp</div>
@@ -431,227 +506,19 @@ export default async function DashboardPage({
               </div>
             </div>
 
-            <div className="mt-6 space-y-6">
-              {/* Price & Volume + Signal Summary */}
+            <div className="mt-4 space-y-4">
+              <div>
+                <h3 className="text-lg font-medium">Strongest Signal</h3>
+                {analysisData.analysis ? (
+                  <MarkdownAnalysis text={analysisData.analysis} />
+                ) : (
+                  <p className="text-gray-200 mt-1">(no analysis text provided)</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Price & Volume Card */}
                 <div className="p-4 bg-gray-800 rounded-lg">
-                  <h4 className="text-sm font-semibold text-gray-300 mb-3">Price & Volume</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Date:</span>
-                      <span className="text-white font-mono">{analysisData.date ?? "N/A"}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Price:</span>
-                      <span className="text-white text-lg font-semibold">
-                        ${analysisData.price !== undefined && analysisData.price !== null ? analysisData.price.toFixed(2) : "N/A"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Change:</span>
-                      <span className={`font-semibold ${
-                        (analysisData.change_pct ?? 0) < 0 ? 'text-red-400' : 'text-green-400'
-                      }`}>
-                        {analysisData.change_pct !== undefined && analysisData.change_pct !== null 
-                          ? `${analysisData.change_pct > 0 ? '+' : ''}${analysisData.change_pct.toFixed(2)}%` 
-                          : "N/A"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Volume:</span>
-                      <span className="text-white font-mono text-sm">
-                        {analysisData.volume !== undefined && analysisData.volume !== null 
-                          ? analysisData.volume.toLocaleString() 
-                          : "N/A"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Signal Summary Card */}
-                <div className="p-4 bg-gray-800 rounded-lg">
-                  <h4 className="text-sm font-semibold text-gray-300 mb-3">Signal Breakdown</h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Bullish Signals</span>
-                      <span className="text-green-400 text-2xl font-bold">{analysisData.bullish_count ?? 0}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Bearish Signals</span>
-                      <span className="text-red-400 text-2xl font-bold">{analysisData.bearish_count ?? 0}</span>
-                    </div>
-                    <div className="pt-2 border-t border-gray-700">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-400">Net Bias</span>
-                        <span className={`font-semibold ${
-                          (analysisData.bullish_count ?? 0) > (analysisData.bearish_count ?? 0) 
-                            ? 'text-green-400' 
-                            : (analysisData.bullish_count ?? 0) < (analysisData.bearish_count ?? 0)
-                            ? 'text-red-400'
-                            : 'text-gray-400'
-                        }`}>
-                          {(analysisData.bullish_count ?? 0) > (analysisData.bearish_count ?? 0) 
-                            ? 'BULLISH' 
-                            : (analysisData.bullish_count ?? 0) < (analysisData.bearish_count ?? 0)
-                            ? 'BEARISH'
-                            : 'NEUTRAL'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Moving Averages */}
-              <div className="p-4 bg-gray-800 rounded-lg">
-                <h4 className="text-sm font-semibold text-gray-300 mb-3">Moving Averages</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {analysisData.moving_averages ? (
-                    <>
-                      <div>
-                        <div className="text-xs text-gray-400 mb-1">10 SMA</div>
-                        <div className="text-lg font-semibold text-white">${analysisData.moving_averages.SMA_10.toFixed(2)}</div>
-                        <div className={`text-xs ${
-                          analysisData.price > analysisData.moving_averages.SMA_10 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {((analysisData.price - analysisData.moving_averages.SMA_10) / analysisData.moving_averages.SMA_10 * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-400 mb-1">20 SMA</div>
-                        <div className="text-lg font-semibold text-white">${analysisData.moving_averages.SMA_20.toFixed(2)}</div>
-                        <div className={`text-xs ${
-                          analysisData.price > analysisData.moving_averages.SMA_20 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {((analysisData.price - analysisData.moving_averages.SMA_20) / analysisData.moving_averages.SMA_20 * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-400 mb-1">50 SMA</div>
-                        <div className="text-lg font-semibold text-white">${analysisData.moving_averages.SMA_50.toFixed(2)}</div>
-                        <div className={`text-xs ${
-                          analysisData.price > analysisData.moving_averages.SMA_50 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {((analysisData.price - analysisData.moving_averages.SMA_50) / analysisData.moving_averages.SMA_50 * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-400 mb-1">200 SMA</div>
-                        <div className="text-lg font-semibold text-white">${analysisData.moving_averages.SMA_200.toFixed(2)}</div>
-                        <div className={`text-xs ${
-                          analysisData.price > analysisData.moving_averages.SMA_200 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {((analysisData.price - analysisData.moving_averages.SMA_200) / analysisData.moving_averages.SMA_200 * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-400 mb-1">10 EMA</div>
-                        <div className="text-lg font-semibold text-white">${analysisData.moving_averages.EMA_10.toFixed(2)}</div>
-                        <div className={`text-xs ${
-                          analysisData.price > analysisData.moving_averages.EMA_10 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {((analysisData.price - analysisData.moving_averages.EMA_10) / analysisData.moving_averages.EMA_10 * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-400 mb-1">20 EMA</div>
-                        <div className="text-lg font-semibold text-white">${analysisData.moving_averages.EMA_20.toFixed(2)}</div>
-                        <div className={`text-xs ${
-                          analysisData.price > analysisData.moving_averages.EMA_20 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {((analysisData.price - analysisData.moving_averages.EMA_20) / analysisData.moving_averages.EMA_20 * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="text-gray-400 text-sm col-span-3">No moving average data available</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Key Oscillators */}
-              <div className="p-4 bg-gray-800 rounded-lg">
-                <h4 className="text-sm font-semibold text-gray-300 mb-3">Key Oscillators</h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-                  {analysisData.indicators ? (
-                    <>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400 mb-1">RSI</div>
-                        <div className={`text-2xl font-bold ${
-                          analysisData.indicators.RSI > 70 ? 'text-red-400' :
-                          analysisData.indicators.RSI < 30 ? 'text-green-400' :
-                          'text-white'
-                        }`}>
-                          {analysisData.indicators.RSI.toFixed(1)}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400 mb-1">MACD</div>
-                        <div className={`text-2xl font-bold ${
-                          analysisData.indicators.MACD > 0 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {analysisData.indicators.MACD.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400 mb-1">ADX</div>
-                        <div className={`text-2xl font-bold ${
-                          analysisData.indicators.ADX > 25 ? 'text-blue-400' : 'text-gray-400'
-                        }`}>
-                          {analysisData.indicators.ADX.toFixed(1)}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400 mb-1">Stochastic</div>
-                        <div className={`text-2xl font-bold ${
-                          analysisData.indicators.Stochastic > 80 ? 'text-red-400' :
-                          analysisData.indicators.Stochastic < 20 ? 'text-green-400' :
-                          'text-white'
-                        }`}>
-                          {analysisData.indicators.Stochastic.toFixed(1)}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400 mb-1">CCI</div>
-                        <div className={`text-2xl font-bold ${
-                          analysisData.indicators.CCI > 0 ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                          {analysisData.indicators.CCI.toFixed(1)}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400 mb-1">MFI</div>
-                        <div className={`text-2xl font-bold ${
-                          analysisData.indicators.MFI > 80 ? 'text-red-400' :
-                          analysisData.indicators.MFI < 20 ? 'text-green-400' :
-                          'text-white'
-                        }`}>
-                          {analysisData.indicators.MFI.toFixed(1)}
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400 mb-1">BB Position</div>
-                        <div className={`text-2xl font-bold ${
-                          analysisData.indicators.BB_Position > 0.8 ? 'text-red-400' :
-                          analysisData.indicators.BB_Position < 0.2 ? 'text-green-400' :
-                          'text-white'
-                        }`}>
-                          {(analysisData.indicators.BB_Position * 100).toFixed(0)}%
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400 mb-1">Volatility</div>
-                        <div className={`text-2xl font-bold ${
-                          analysisData.indicators.Volatility > 50 ? 'text-yellow-400' : 'text-white'
-                        }`}>
-                          {analysisData.indicators.Volatility.toFixed(0)}%
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="col-span-8 text-gray-400 text-sm text-center">No oscillator data available</div>
-                  )}
+                  <h4 className="text-sm font-semibold text-gray-300">Contact Us With Any Questions or Suggestions</h4>
                 </div>
               </div>
             </div>
@@ -659,39 +526,27 @@ export default async function DashboardPage({
         </div>
 
         <section className="mt-8">
-          <h3 className="text-xl font-semibold mb-4">Signals Analyzed ({analysisData.signals?.length ?? 0})</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {Array.isArray(analysisData.signals) && analysisData.signals.length > 0 ? (
-              (analysisData.signals as AnalysisSignal[]).map((s, idx) => (
-                <div key={idx} className="p-3 bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg border border-gray-700 hover:border-gray-600 transition-all">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-white truncate">{s.signal}</div>
-                      <div className="text-sm text-gray-300 mt-1">{s.desc}</div>
+          <h3 className="text-xl font-semibold mb-4">Signals Analyzed</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.isArray(analysisData.signals_analyzed) ? (
+              (analysisData.signals_analyzed as AnalysisSignal[]).map((s, idx) => (
+                <div key={idx} className="p-3 bg-gradient-to-br from-gray-800 to-gray-700 rounded-lg border border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold">{s.signal}</div>
+                      <div className="text-sm text-gray-300">{s.desc}</div>
                     </div>
-                    <div className="flex-shrink-0">
+                    <div className="ml-3">
                       <StrengthBadge strength={s.strength} />
                     </div>
                   </div>
-                  <div className="text-xs text-gray-400 mt-2 uppercase tracking-wide">{s.category}</div>
+                  <div className="text-xs text-gray-400 mt-2">{s.category}</div>
                 </div>
               ))
             ) : (
-              <div className="text-gray-400 col-span-full text-center py-8">No signals found in analysis data.</div>
+              <div className="text-gray-400">No signals array found in analysis JSON.</div>
             )}
           </div>
-        </section>
-        
-        {/* AI-generated narrative / analysis text (rendered with lightweight markdown) */}
-        <section className="mt-8">
-          <h3 className="text-xl font-semibold mb-4">AI Narrative</h3>
-          {analysisData.analysis ? (
-            <div className="p-4 bg-gray-800 rounded-lg">
-              <MarkdownAnalysis text={analysisData.analysis} />
-            </div>
-          ) : (
-            <p className="text-gray-400">No analysis text provided.</p>
-          )}
         </section>
       </div>
     </main>
