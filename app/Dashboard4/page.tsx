@@ -116,14 +116,14 @@ async function getAvailableSymbols(): Promise<string[]> {
       files.forEach(file => {
         const fileName = file.name.split('/').pop() || '';
         
-        // Match signals_SYMBOL_ pattern
-        const signalsMatch = fileName.match(/signals_([A-Z]+)_/);
+        // Match signals_SYMBOL_ pattern OR -SYMBOL-signals- pattern
+        const signalsMatch = fileName.match(/signals_([A-Z]+)_/) || fileName.match(/-([A-Z]+)-signals-/);
         if (signalsMatch) {
           symbolSet.add(signalsMatch[1]);
         }
         
-        // Match SYMBOL_gemini_analysis pattern
-        const geminiMatch = fileName.match(/([A-Z]+)_gemini_analysis_/);
+        // Match SYMBOL_gemini_analysis pattern OR -SYMBOL-gemini-analysis- pattern
+        const geminiMatch = fileName.match(/([A-Z]+)_gemini_analysis_/) || fileName.match(/-([A-Z]+)-gemini-analysis-/);
         if (geminiMatch) {
           symbolSet.add(geminiMatch[1]);
         }
@@ -166,10 +166,20 @@ async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResp
       .bucket(BUCKET_NAME)
       .getFiles({ prefix: datePrefix });
     
+    // Debug: log all files found for this symbol
+    console.log(`🔍 Searching for ${symbol} in ${datePrefix}`);
+    files.forEach(file => {
+      if (file.name.includes(symbol)) {
+        console.log(`📁 Found related file: ${file.name}`);
+      }
+    });
+
+    // ✅ UPDATED: Support both file naming patterns
     const signalsFile = files
       .filter(
         (f) =>
-          f.name.includes(`signals_${symbol}`) &&
+          (f.name.includes(`signals_${symbol}`) || 
+           f.name.includes(`-${symbol}-signals-`)) &&
           f.name.endsWith(".json")
       )
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -178,7 +188,8 @@ async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResp
     const geminiFile = files
       .filter(
         (f) =>
-          f.name.includes(`${symbol}_gemini_analysis_`) &&
+          (f.name.includes(`${symbol}_gemini_analysis_`) ||
+           f.name.includes(`-${symbol}-gemini-analysis-`)) &&
           f.name.endsWith(".json")
       )
       .sort((a, b) => a.name.localeCompare(b.name))
@@ -190,6 +201,7 @@ async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResp
 
       let technicalData: Record<string, unknown> | null = null;
       if (signalsFile) {
+        console.log(`✅ Loading signals file: ${signalsFile.name}`);
         const file = storageClient.bucket(BUCKET_NAME).file(signalsFile.name);
         const [data] = await file.download();
         technicalData = JSON.parse(data.toString()) as Record<string, unknown>;
@@ -197,6 +209,7 @@ async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResp
 
       let geminiAnalysis: Record<string, unknown> | null = null;
       if (geminiFile) {
+        console.log(`✅ Loading gemini file: ${geminiFile.name}`);
         const file = storageClient.bucket(BUCKET_NAME).file(geminiFile.name);
         const [data] = await file.download();
         geminiAnalysis = JSON.parse(data.toString()) as Record<string, unknown>;
@@ -240,6 +253,11 @@ export default async function DashboardPage({
   let fetched: TechnicalDataResponse | null = null;
   try {
     fetched = await getLatestTechnicalData(symbol);
+    console.log(`✅ Fetched data for ${symbol}:`, {
+      hasTechnicalData: !!fetched?.technicalData,
+      hasGeminiAnalysis: !!fetched?.geminiAnalysis,
+      date: fetched?.date
+    });
   } catch (err) {
     console.error("Failed to fetch latest technical data:", err);
     fetched = null;
