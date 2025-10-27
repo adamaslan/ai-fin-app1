@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'My App - Authentication with Clerk',
-  description: 'Secure authentication powered by Clerk',
+  title: 'AI + Human Financial Insights',
+  description: 'Smart People Powering AI to Help People Create Financial Insights',
 }
 
 export default function RootLayout({

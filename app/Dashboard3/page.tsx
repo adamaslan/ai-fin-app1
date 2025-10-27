@@ -330,7 +330,7 @@ export default async function DashboardPage({
                 {availableSymbols.map((sym) => (
                   <a
                     key={sym}
-                    href={`/Dashboard2?symbol=${sym}`}
+                    href={`/Dashboard3?symbol=${sym}`}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       sym === symbol
                         ? "bg-blue-600 text-white"
@@ -370,7 +370,7 @@ export default async function DashboardPage({
               {availableSymbols.map((sym) => (
                 <a
                   key={sym}
-                  href={`/Dashboard2?symbol=${sym}`}
+                  href={`/Dashboard3?symbol=${sym}`}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     sym === symbol
                       ? "bg-blue-600 text-white"
