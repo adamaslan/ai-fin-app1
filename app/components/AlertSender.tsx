@@ -32,7 +32,7 @@ export default async function AlertSender({ signal, symbol, userEmail }: AlertSe
       html: emailContent,
     });
 
-    console.log(`✅ Email sent successfully to ${userEmail} for ${symbol}`, result.id);
+    console.log(`✅ Email sent successfully to ${userEmail} for ${symbol}`, result);
     
     // Return null since this is a server component with no UI
     return null;
@@ -184,7 +184,7 @@ function generateEmailHTML(signal: AnalysisSignal, symbol: string): string {
               <div class="signal-row">
                 <span class="label">Strength</span>
                 <div>
-                  <span class="strength-badge">${signal.strength}</span>
+                  <span class="strength-badge ${strengthClass}">${signal.strength}</span>
                 </div>
               </div>
             </div>
