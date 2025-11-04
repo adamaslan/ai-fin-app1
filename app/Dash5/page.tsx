@@ -230,6 +230,9 @@ export default async function DashboardPage({
   // Get user email
   const userEmail = user.primaryEmailAddress?.emailAddress;
 
+  // Define dateRange using the fetched date
+  const dateRange = fetched?.date || "N/A";
+
   // ... [Keep all your existing component functions: StrengthBadge, MarkdownAnalysis]
 
   function StrengthBadge({ strength }: { strength: string }) {
@@ -339,9 +342,10 @@ export default async function DashboardPage({
       {/* 🚀 Send email alert using server component (no UI rendered) */}
       {strongestSignal && userEmail && (
         <AlertSender 
-          signal={strongestSignal} 
-          symbol={analysisData.symbol} 
-          userEmail={userEmail} 
+            signal={strongestSignal} 
+            symbol={analysisData.symbol} 
+            userEmail={userEmail}
+            dateRange={dateRange} 
         />
       )}
 
