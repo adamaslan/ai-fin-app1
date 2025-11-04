@@ -12,6 +12,7 @@ interface AlertSenderProps {
   signal: AnalysisSignal;
   symbol: string;
   userEmail: string;
+  dateRange: string;
 }
 
 // Initialize Resend outside component for reuse
@@ -21,23 +22,23 @@ const resend = new Resend(process.env.RESEND_API_KEY);
  * Server Component that sends email alerts for strongest signals
  * This component has no UI - it only handles the email sending logic
  */
-export default async function AlertSender({ signal, symbol, userEmail }: AlertSenderProps) {
+export default async function AlertSender({ signal, symbol, userEmail, dateRange }: AlertSenderProps) {
   try {
-    const emailContent = generateEmailHTML(signal, symbol);
+    const emailContent = generateEmailHTML(signal, symbol, dateRange);
 
     const result = await resend.emails.send({
       from: 'Stock Alerts <alerts@finance.tastytechbytes.com>',
       to: userEmail,
-      subject: `📊 ${symbol} Alert: ${signal.signal} (${signal.strength})`,
+      subject: `📊 Weekly ${symbol} Alert: ${signal.signal} (${signal.strength})`,
       html: emailContent,
     });
 
-    console.log(`✅ Email sent successfully to ${userEmail} for ${symbol}`, result);
+    console.log(`✅ Weekly alert email sent successfully to ${userEmail} for ${symbol}`, result.data?.id);
     
     // Return null since this is a server component with no UI
     return null;
   } catch (error) {
-    console.error('❌ Failed to send alert email:', error);
+    console.error('❌ Failed to send weekly alert email:', error);
     // Return null even on error - we don't want to break the page render
     return null;
   }
@@ -46,8 +47,7 @@ export default async function AlertSender({ signal, symbol, userEmail }: AlertSe
 /**
  * Generate HTML email content
  */
-function generateEmailHTML(signal: AnalysisSignal, symbol: string): string {
-  const strengthClass = getStrengthClass(signal.strength);
+function generateEmailHTML(signal: AnalysisSignal, symbol: string, dateRange: string): string {
   const strengthColor = getStrengthColor(signal.strength);
 
   return `
@@ -91,6 +91,15 @@ function generateEmailHTML(signal: AnalysisSignal, symbol: string): string {
           }
           .content { 
             padding: 30px 20px;
+          }
+          .date-range {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #1e40af;
           }
           .signal-box { 
             background: #f9fafb;
@@ -143,26 +152,30 @@ function generateEmailHTML(signal: AnalysisSignal, symbol: string): string {
             margin: 5px 0;
           }
           .cta-note {
-            background: #eff6ff;
-            border-left: 4px solid #3b82f6;
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
             padding: 15px;
             margin: 20px 0;
             border-radius: 4px;
             font-size: 14px;
-            color: #1e40af;
+            color: #92400e;
           }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>📊 Stock Alert: ${symbol}</h1>
-            <p>Strongest Signal Detected</p>
+            <h1>📊 Weekly Stock Alert: ${symbol}</h1>
+            <p>Strongest Signal from Past Week</p>
           </div>
           
           <div class="content">
+            <div class="date-range">
+              <strong>📅 Analysis Period:</strong> ${dateRange}
+            </div>
+
             <p style="font-size: 15px; color: #4b5563; margin-top: 0;">
-              Our technical analysis has identified the strongest signal for <strong>${symbol}</strong>:
+              Our technical analysis has identified the <strong>strongest signal</strong> for <strong>${symbol}</strong> over the past week:
             </p>
             
             <div class="signal-box">
@@ -184,14 +197,14 @@ function generateEmailHTML(signal: AnalysisSignal, symbol: string): string {
               <div class="signal-row">
                 <span class="label">Strength</span>
                 <div>
-                  <span class="strength-badge ${strengthClass}">${signal.strength}</span>
+                  <span class="strength-badge">${signal.strength}</span>
                 </div>
               </div>
             </div>
 
             <div class="cta-note">
-              <strong>Note:</strong> This is the strongest signal currently detected for ${symbol} based on technical analysis. 
-              Review all signals in your dashboard for complete context.
+              <strong>⚠️ Important:</strong> This is the strongest signal detected across all available data from the past 7 days. 
+              Review your full dashboard for comprehensive analysis and additional context.
             </div>
 
             <p style="font-size: 13px; color: #6b7280; margin-bottom: 0;">
@@ -209,7 +222,7 @@ function generateEmailHTML(signal: AnalysisSignal, symbol: string): string {
           
           <div class="footer">
             <p><strong>TastyTechBytes Finance</strong></p>
-            <p>You're receiving this because you have stock alerts enabled.</p>
+            <p>You're receiving this because you have weekly stock alerts enabled.</p>
             <p>© ${new Date().getFullYear()} TastyTechBytes. All rights reserved.</p>
           </div>
         </div>
@@ -230,15 +243,4 @@ function getStrengthColor(strength: string): string {
   if (upperStrength.includes('HIGH')) return '#2563eb'; // blue-600
   
   return '#6b7280'; // gray-500
-}
-
-/**
- * Get CSS class based on strength
- */
-function getStrengthClass(strength: string): string {
-  const upperStrength = strength.toUpperCase();
-  if (upperStrength.includes('EXTREME')) return 'extreme';
-  if (upperStrength.includes('HIGH')) return 'high';
-  if (upperStrength.includes('MEDIUM')) return 'medium';
-  return 'low';
 }

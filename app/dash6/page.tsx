@@ -1,4 +1,4 @@
-// app/Dashboard5/page.tsx
+// app/dash6/page.tsx
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Storage } from "@google-cloud/storage";
@@ -8,10 +8,6 @@ interface TechnicalDataResponse {
   technicalData: Record<string, unknown> | null;
   geminiAnalysis: Record<string, unknown> | null;
   date: string;
-}
-
-interface GetFilesApiResponse {
-  prefixes?: string[];
 }
 
 interface AnalysisSignal {
@@ -33,6 +29,11 @@ interface AnalysisData {
   risk?: string[];
   key_levels?: string[];
   recommendation?: string;
+}
+
+interface WeeklySignalResult {
+  signal: AnalysisSignal;
+  date: string;
 }
 
 export const dynamic = "force-dynamic";
@@ -74,45 +75,33 @@ const BUCKET_NAME = "ttb-bucket1";
 
 /**
  * Get list of all available symbols from ALL date folders
+ * OPTIMIZED: Single API call instead of N+1 calls
  */
 async function getAvailableSymbols(): Promise<string[]> {
   try {
-    const [, , apiResponse] = await storageClient
+    // Fetch ALL files under daily/ in one recursive call
+    const [files] = await storageClient
       .bucket(BUCKET_NAME)
-      .getFiles({
-        prefix: "daily/",
-        delimiter: "/",
-      });
-    const apiTyped = apiResponse as GetFilesApiResponse | undefined;
-    const dateFolders: string[] = apiTyped?.prefixes ?? [];
+      .getFiles({ prefix: "daily/" });
 
-    if (dateFolders.length === 0) {
-      return [];
-    }
-    // Search across ALL date folders to find all symbols
     const symbolSet = new Set<string>();
 
-    for (const datePrefix of dateFolders) {
-      const [files] = await storageClient
-        .bucket(BUCKET_NAME)
-        .getFiles({ prefix: datePrefix });
+    files.forEach(file => {
+      const fileName = file.name.split('/').pop() || '';
 
-      files.forEach(file => {
-        const fileName = file.name.split('/').pop() || '';
+      // Match signals_SYMBOL_ pattern
+      const signalsMatch = fileName.match(/signals_([A-Z]+)_/);
+      if (signalsMatch) {
+        symbolSet.add(signalsMatch[1]);
+      }
 
-        // Match signals_SYMBOL_ pattern
-        const signalsMatch = fileName.match(/signals_([A-Z]+)_/);
-        if (signalsMatch) {
-          symbolSet.add(signalsMatch[1]);
-        }
+      // Match SYMBOL_gemini_analysis pattern
+      const geminiMatch = fileName.match(/([A-Z]+)_gemini_analysis_/);
+      if (geminiMatch) {
+        symbolSet.add(geminiMatch[1]);
+      }
+    });
 
-        // Match SYMBOL_gemini_analysis pattern
-        const geminiMatch = fileName.match(/([A-Z]+)_gemini_analysis_/);
-        if (geminiMatch) {
-          symbolSet.add(geminiMatch[1]);
-        }
-      });
-    }
     return Array.from(symbolSet).sort();
   } catch (error) {
     console.error("Error fetching available symbols:", error);
@@ -121,79 +110,169 @@ async function getAvailableSymbols(): Promise<string[]> {
 }
 
 /**
+ * Get date folders from the past 7 days
+ */
+function getDateFoldersLastWeek(): string[] {
+  const dates: string[] = [];
+  const today = new Date();
+  
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+    dates.push(`daily/${dateStr}/`);
+  }
+  
+  return dates;
+}
+
+/**
  * Fetches the latest available technical + gemini data for a given symbol.
  * Searches across ALL date folders to find the most recent data for the symbol.
  */
 async function getLatestTechnicalData(symbol: string): Promise<TechnicalDataResponse> {
-  // Get all date folders under /daily/
-  const [, , apiResponse] = await storageClient
+  // Fetch ALL files under daily/ in one call
+  const [files] = await storageClient
     .bucket(BUCKET_NAME)
-    .getFiles({
-      prefix: "daily/",
-      delimiter: "/",
-    });
-  const apiTyped = apiResponse as GetFilesApiResponse | undefined;
-  const dateFolders: string[] = apiTyped?.prefixes ?? [];
+    .getFiles({ prefix: "daily/" });
 
-  if (dateFolders.length === 0) {
-    throw new Error("No date folders found in /daily/");
+  if (files.length === 0) {
+    throw new Error("No files found in /daily/");
   }
-  // Sort date folders in descending order (newest first)
-  const sortedDateFolders = dateFolders.sort().reverse();
-  // Search through date folders starting with the most recent
-  for (const datePrefix of sortedDateFolders) {
-    const [files] = await storageClient
-      .bucket(BUCKET_NAME)
-      .getFiles({ prefix: datePrefix });
 
-    const signalsFile = files
-      .filter(
-        (f) =>
-          f.name.includes(`signals_${symbol}`) &&
-          f.name.endsWith(".json")
-      )
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .pop();
-    const geminiFile = files
-      .filter(
-        (f) =>
-          f.name.includes(`${symbol}_gemini_analysis_`) &&
-          f.name.endsWith(".json")
-      )
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .pop();
-    // If we found files for this symbol in this date folder, use them
-    if (signalsFile || geminiFile) {
-      const latestDate = datePrefix.split("/")[1];
-      let technicalData: Record<string, unknown> | null = null;
-      if (signalsFile) {
-        const file = storageClient.bucket(BUCKET_NAME).file(signalsFile.name);
-        const [data] = await file.download();
-        technicalData = JSON.parse(data.toString()) as Record<string, unknown>;
-      }
-      let geminiAnalysis: Record<string, unknown> | null = null;
-      if (geminiFile) {
-        const file = storageClient.bucket(BUCKET_NAME).file(geminiFile.name);
-        const [data] = await file.download();
-        geminiAnalysis = JSON.parse(data.toString()) as Record<string, unknown>;
-      }
-      return { technicalData, geminiAnalysis, date: latestDate };
-    }
+  // Filter files for this symbol
+  const symbolFiles = files.filter(f => {
+    const fileName = f.name.split('/').pop() || '';
+    return (
+      fileName.includes(`signals_${symbol}`) ||
+      fileName.includes(`${symbol}_gemini_analysis_`)
+    ) && fileName.endsWith('.json');
+  });
+
+  if (symbolFiles.length === 0) {
+    throw new Error(`No matching files found for ${symbol}`);
   }
-  // If we searched all folders and found nothing
-  throw new Error(
-    `No matching files found for ${symbol} in any date folder`
-  );
+
+  // Sort by file path (which includes date) to get most recent
+  symbolFiles.sort((a, b) => b.name.localeCompare(a.name));
+
+  // Get the most recent signals and gemini files
+  const signalsFile = symbolFiles.find(f => f.name.includes(`signals_${symbol}`));
+  const geminiFile = symbolFiles.find(f => f.name.includes(`${symbol}_gemini_analysis_`));
+
+  const latestDate = signalsFile?.name.split('/')[1] || geminiFile?.name.split('/')[1] || '';
+
+  let technicalData: Record<string, unknown> | null = null;
+  if (signalsFile) {
+    const [data] = await signalsFile.download();
+    technicalData = JSON.parse(data.toString()) as Record<string, unknown>;
+  }
+
+  let geminiAnalysis: Record<string, unknown> | null = null;
+  if (geminiFile) {
+    const [data] = await geminiFile.download();
+    geminiAnalysis = JSON.parse(data.toString()) as Record<string, unknown>;
+  }
+
+  return { technicalData, geminiAnalysis, date: latestDate };
 }
 
-// Function to find the strongest signal
+/**
+ * Get the strongest signal from the past week for a given symbol
+ */
+async function getStrongestSignalLastWeek(symbol: string): Promise<WeeklySignalResult | null> {
+  try {
+    const dateFolders = getDateFoldersLastWeek();
+    
+    // Fetch ALL files in one call
+    const [allFiles] = await storageClient
+      .bucket(BUCKET_NAME)
+      .getFiles({ prefix: "daily/" });
+
+    let strongestOverall: AnalysisSignal | null = null;
+    let strongestDate = '';
+
+    // Process each date folder
+    for (const datePrefix of dateFolders) {
+      const filesInDate = allFiles.filter(f => f.name.startsWith(datePrefix));
+      
+      const geminiFile = filesInDate.find(
+        f => f.name.includes(`${symbol}_gemini_analysis_`) && f.name.endsWith('.json')
+      );
+
+      if (geminiFile) {
+        try {
+          const [data] = await geminiFile.download();
+          const analysisData = JSON.parse(data.toString()) as AnalysisData;
+          
+          if (analysisData.signals_analyzed && analysisData.signals_analyzed.length > 0) {
+            const dayStrongest = getStrongestSignal(analysisData.signals_analyzed);
+            
+            if (dayStrongest) {
+              if (!strongestOverall || isStrongerSignal(dayStrongest, strongestOverall)) {
+                strongestOverall = dayStrongest;
+                strongestDate = datePrefix.split('/')[1]; // Extract YYYY-MM-DD
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error processing file ${geminiFile.name}:`, error);
+        }
+      }
+    }
+
+    if (strongestOverall) {
+      return {
+        signal: strongestOverall,
+        date: strongestDate
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error fetching strongest signal from last week:", error);
+    return null;
+  }
+}
+
+/**
+ * Function to find the strongest signal
+ * FIXED: Now properly handles null initial value
+ */
 function getStrongestSignal(signals: AnalysisSignal[]): AnalysisSignal | null {
   const strengthOrder = ["EXTREME", "HIGH", "MEDIUM", "LOW"];
+  
   return signals.reduce((strongest, current) => {
+    // Handle initial null case
+    if (!strongest) {
+      return current;
+    }
+    
     const currentStrength = current.strength.split(" ")[0]; // Extract "EXTREME", "HIGH", etc.
-    const strongestStrength = strongest?.strength.split(" ")[0] || "";
-    return strengthOrder.indexOf(currentStrength) < strengthOrder.indexOf(strongestStrength) ? current : strongest;
+    const strongestStrength = strongest.strength.split(" ")[0];
+    
+    const currentIndex = strengthOrder.indexOf(currentStrength);
+    const strongestIndex = strengthOrder.indexOf(strongestStrength);
+    
+    // Lower index = stronger signal
+    return currentIndex < strongestIndex ? current : strongest;
   }, null as AnalysisSignal | null);
+}
+
+/**
+ * Compare two signals to determine which is stronger
+ */
+function isStrongerSignal(signal1: AnalysisSignal, signal2: AnalysisSignal): boolean {
+  const strengthOrder = ["EXTREME", "HIGH", "MEDIUM", "LOW"];
+  
+  const strength1 = signal1.strength.split(" ")[0];
+  const strength2 = signal2.strength.split(" ")[0];
+  
+  const index1 = strengthOrder.indexOf(strength1);
+  const index2 = strengthOrder.indexOf(strength2);
+  
+  // Lower index = stronger signal
+  return index1 < index2;
 }
 
 export default async function DashboardPage({
@@ -204,12 +283,15 @@ export default async function DashboardPage({
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  // ... [Keep all your existing data fetching logic]
-
+  // Get available symbols
   const availableSymbols = await getAvailableSymbols();
+  console.log("📊 Available symbols:", availableSymbols);
+
+  // Get symbol from query params or default
   const params = await searchParams;
   const symbol = params.symbol || availableSymbols[0] || "ORCL";
   
+  // Fetch latest data for display
   let fetched: TechnicalDataResponse | null = null;
   try {
     fetched = await getLatestTechnicalData(symbol);
@@ -222,19 +304,17 @@ export default async function DashboardPage({
     ? (fetched.geminiAnalysis ?? fetched.technicalData) as unknown as AnalysisData
     : null;
 
-  // Identify strongest signal
-  const strongestSignal = analysisData?.signals_analyzed 
-    ? getStrongestSignal(analysisData.signals_analyzed)
-    : null;
-
-  // Get user email
+  // Get strongest signal from the past week
+  const weeklyStrongestResult = await getStrongestSignalLastWeek(symbol);
   const userEmail = user.primaryEmailAddress?.emailAddress;
 
-  // Define dateRange using the fetched date
-  const dateRange = fetched?.date || "N/A";
+  // Calculate date range for display
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(today.getDate() - 7);
+  const dateRange = `${weekAgo.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
-  // ... [Keep all your existing component functions: StrengthBadge, MarkdownAnalysis]
-
+  // Helper components
   function StrengthBadge({ strength }: { strength: string }) {
     const base = "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium";
     const color =
@@ -306,14 +386,14 @@ export default async function DashboardPage({
               <p className="text-gray-400 mt-2">Technical Analysis Dashboard</p>
             </div>
             <div className="flex items-center gap-3">
-              <label htmlFor="stock-select" className="text-sm font-medium text-gray-300">
+              <label className="text-sm font-medium text-gray-300">
                 Select Stock:
               </label>
               <div className="flex gap-2 flex-wrap">
                 {availableSymbols.map((sym) => (
                   <a
                     key={sym}
-                    href={`/Dashboard2?symbol=${sym}`}
+                    href={`/Dashboard5?symbol=${sym}`}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       sym === symbol
                         ? "bg-blue-600 text-white"
@@ -339,13 +419,13 @@ export default async function DashboardPage({
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
-      {/* 🚀 Send email alert using server component (no UI rendered) */}
-      {strongestSignal && userEmail && (
+      {/* 🚀 Send weekly email alert using server component (no UI rendered) */}
+      {weeklyStrongestResult && userEmail && (
         <AlertSender 
-            signal={strongestSignal} 
-            symbol={analysisData.symbol} 
-            userEmail={userEmail}
-            dateRange={dateRange} 
+          signal={weeklyStrongestResult.signal} 
+          symbol={symbol} 
+          userEmail={userEmail}
+          dateRange={dateRange}
         />
       )}
 
@@ -363,7 +443,7 @@ export default async function DashboardPage({
               {availableSymbols.map((sym) => (
                 <a
                   key={sym}
-                  href={`/Dashboard2?symbol=${sym}`}
+                  href={`/Dashboard5?symbol=${sym}`}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     sym === symbol
                       ? "bg-blue-600 text-white"
@@ -377,17 +457,17 @@ export default async function DashboardPage({
           </div>
         </header>
 
-        {/* Email confirmation banner */}
-        {strongestSignal && userEmail && (
-          <div className="mb-6 p-4 bg-green-900/30 border border-green-700 rounded-lg">
+        {/* Weekly Email confirmation banner */}
+        {weeklyStrongestResult && userEmail && (
+          <div className="mb-6 p-4 bg-purple-900/30 border border-purple-700 rounded-lg">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">✅</span>
+              <span className="text-2xl">📧</span>
               <div>
-                <p className="text-green-400 font-medium">
-                  Alert Email Sent
+                <p className="text-purple-400 font-medium">
+                  Weekly Alert Email Sent
                 </p>
                 <p className="text-sm text-gray-300">
-                  The strongest signal ({strongestSignal.signal}) was detected. 
+                  The strongest signal from the past week ({weeklyStrongestResult.signal.signal} on {weeklyStrongestResult.date}) was detected. 
                   An alert has been sent to <span className="font-mono">{userEmail}</span>.
                 </p>
               </div>
@@ -396,10 +476,39 @@ export default async function DashboardPage({
         )}
 
         <div className="grid grid-cols-1 gap-6">
+          {/* Weekly Strongest Signal Card */}
+          {weeklyStrongestResult && (
+            <section className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 p-6 rounded-xl shadow-lg border-2 border-purple-700">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-semibold text-purple-300">🏆 Strongest Signal (Past 7 Days)</h2>
+                  <p className="text-sm text-gray-300 mt-1">Date range: {dateRange}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-gray-400">Detected on</div>
+                  <div className="font-mono text-sm text-purple-300">{weeklyStrongestResult.date}</div>
+                </div>
+              </div>
+              <div className="p-4 bg-gray-900/50 rounded-lg border border-purple-600">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="font-semibold text-xl text-white mb-2">{weeklyStrongestResult.signal.signal}</div>
+                    <div className="text-sm text-gray-300 mb-2">{weeklyStrongestResult.signal.desc}</div>
+                    <div className="text-xs text-gray-400">Category: {weeklyStrongestResult.signal.category}</div>
+                  </div>
+                  <div className="ml-4">
+                    <StrengthBadge strength={weeklyStrongestResult.signal.strength} />
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Current Analysis Section */}
           <section className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-2xl font-semibold">{analysisData.symbol ?? symbol} — Technical Snapshot</h2>
+                <h2 className="text-2xl font-semibold">{analysisData.symbol ?? symbol} — Today&apos;s Analysis</h2>
                 <p className="text-sm text-gray-300 mt-1">Signal count: {analysisData.signal_count}</p>
               </div>
               <div className="text-right">
@@ -417,26 +526,12 @@ export default async function DashboardPage({
                   <p className="text-gray-200 mt-1">(no analysis text provided)</p>
                 )}
               </div>
-
-              {/* Strongest Signal Highlight */}
-              {strongestSignal && (
-                <div className="p-4 bg-gradient-to-r from-purple-900/40 to-blue-900/40 border border-purple-700 rounded-lg">
-                  <h4 className="text-sm font-semibold text-purple-300 mb-2">🎯 Strongest Signal</h4>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-white">{strongestSignal.signal}</div>
-                      <div className="text-sm text-gray-300 mt-1">{strongestSignal.desc}</div>
-                    </div>
-                    <StrengthBadge strength={strongestSignal.strength} />
-                  </div>
-                </div>
-              )}
             </div>
           </section>
         </div>
 
         <section className="mt-8">
-          <h3 className="text-xl font-semibold mb-4">All Signals Analyzed</h3>
+          <h3 className="text-xl font-semibold mb-4">Today&apos;s Signals</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {Array.isArray(analysisData.signals_analyzed) ? (
               (analysisData.signals_analyzed as AnalysisSignal[]).map((s, idx) => (
