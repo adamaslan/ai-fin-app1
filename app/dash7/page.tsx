@@ -2,7 +2,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Storage } from "@google-cloud/storage";
-import AlertSender from "../components/AlertSender";
+import AlertSender from "../components/AlertSender2";
 
 interface TechnicalDataResponse {
   technicalData: Record<string, unknown> | null;
@@ -422,10 +422,11 @@ export default async function DashboardPage({
       {/* 🚀 Send weekly email alert using server component (no UI rendered) */}
       {weeklyStrongestResult && userEmail && (
         <AlertSender 
-          signal={weeklyStrongestResult.signal} 
+          signals={[weeklyStrongestResult.signal]} 
           symbol={symbol} 
           userEmail={userEmail}
           dateRange={dateRange}
+          analysisDate={weeklyStrongestResult.date}
         />
       )}
 
