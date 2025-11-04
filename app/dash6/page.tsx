@@ -508,7 +508,7 @@ export default async function DashboardPage({
           <section className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-2xl font-semibold">{analysisData.symbol ?? symbol} — Today's Analysis</h2>
+                <h2 className="text-2xl font-semibold">{analysisData.symbol ?? symbol} — Today&apos;s Analysis</h2>
                 <p className="text-sm text-gray-300 mt-1">Signal count: {analysisData.signal_count}</p>
               </div>
               <div className="text-right">
@@ -531,7 +531,7 @@ export default async function DashboardPage({
         </div>
 
         <section className="mt-8">
-          <h3 className="text-xl font-semibold mb-4">Today's Signals</h3>
+          <h3 className="text-xl font-semibold mb-4">Today&apos;s Signals</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {Array.isArray(analysisData.signals_analyzed) ? (
               (analysisData.signals_analyzed as AnalysisSignal[]).map((s, idx) => (
