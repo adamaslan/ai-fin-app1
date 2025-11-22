@@ -1,4 +1,4 @@
-// app/components/AlertSender.tsx
+// app/components/AlertSender2.tsx
 import { Resend } from 'resend';
 
 interface AnalysisSignal {

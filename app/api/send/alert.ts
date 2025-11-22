@@ -1,27 +1,48 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { Resend } from 'resend';
+// app/api/send/alert.ts
+import { NextResponse } from 'next/server';
+import { sendAlertEmail } from '../../components/AlertSender2'
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+interface EmailResult {
+  success: boolean;
+  error?: string;
+}
 
-export default async (req: NextApiRequest, res: NextApiResponse) => {
-  const { symbol, dateRange, analysisDate, signals } = req.body;
+export async function POST(request: Request) {
+  const { symbol, dateRange, analysisDate, signals } = await request.json();
 
-  const { data, error } = await resend.emails.send({
-    from: 'Stock Alerts <alerts@finance.tastytechbytes.com>',
-    to: ['chillcoders@gmail.com', 'adamtimuraslan@gmail.com'],
-    subject: `🏆 ${symbol} Weekly Alert: Top AI-Ranked Signals`,
-    html: generateEmailHTML(signals, symbol, dateRange, analysisDate), // Use your HTML generator
-  });
+  // Get recipients from environment variable
+  const alertRecipients = process.env.RESEND_ALERT_RECIPIENTS?.split(',') || [];
 
-  if (error) {
-    return res.status(400).json(error);
+  if (alertRecipients.length === 0) {
+    console.warn('⚠️ No alert recipients configured in RESEND_ALERT_RECIPIENTS');
+    return NextResponse.json(
+      { error: 'No recipients configured' },
+      { status: 400 }
+    );
   }
 
-  res.status(200).json(data);
-};
+  try {
+    const results = await Promise.all(
+      alertRecipients.map(async (userEmail): Promise<EmailResult> => {
+        return await sendAlertEmail({ signals, symbol, userEmail, dateRange, analysisDate });
+      })
+    );
 
-// Add your `generateEmailHTML` function here or import it
-function generateEmailHTML(signals: any[], symbol: string, dateRange: string, analysisDate: string) {
-  // Your existing email HTML logic
-  return `<html>...</html>`;
+    const failures = results.filter(result => !result.success);
+    if (failures.length > 0) {
+      return NextResponse.json(
+        { error: 'Some emails failed to send', failures },
+        { status: 400 }
+      );
+    }
+
+    console.log(`📤 Alerts sent to ${alertRecipients.join(', ')}`);
+    return NextResponse.json({ success: true, recipients: alertRecipients });
+  } catch (error) {
+    console.error('API Error:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
+  }
 }
