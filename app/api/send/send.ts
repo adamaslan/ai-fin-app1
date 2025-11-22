@@ -6,10 +6,10 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
   const { data, error } = await resend.emails.send({
-    from: 'Info <info@tastytechbytes.com>',
+    from: 'Finance <info@tastytechbytes.com>',
     to: ['chillcoders@gmail.com'],
     subject: 'Welcome to TastyTechBytes!',
-    react: EmailTemplate({ firstName: 'John' }),
+    react: EmailTemplate({ firstName: 'Dog' }),
   });
 
   if (error) {
