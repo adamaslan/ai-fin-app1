@@ -1,6 +1,5 @@
-// app/api/send/alert.ts
 import { NextResponse } from 'next/server';
-import { sendAlertEmail } from '../../components/AlertSender2'
+import sendAlertEmail from '../../components/AlertSender2';
 
 interface EmailResult {
   success: boolean;
@@ -8,6 +7,7 @@ interface EmailResult {
 }
 
 export async function POST(request: Request) {
+  // Parse the request body
   const { symbol, dateRange, analysisDate, signals } = await request.json();
 
   // Get recipients from environment variable
@@ -24,7 +24,15 @@ export async function POST(request: Request) {
   try {
     const results = await Promise.all(
       alertRecipients.map(async (userEmail): Promise<EmailResult> => {
-        return await sendAlertEmail({ signals, symbol, userEmail, dateRange, analysisDate });
+        // Capture the result from the email sender
+        const result = await sendAlertEmail({ signals, symbol, userEmail, dateRange, analysisDate });
+        
+        // FIX: If sendAlertEmail returns null/undefined, return a failure object instead
+        if (!result) {
+          return { success: false, error: 'Email sender returned null' };
+        }
+        
+        return result;
       })
     );
 
