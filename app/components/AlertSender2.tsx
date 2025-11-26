@@ -1,5 +1,10 @@
-// app/components/AlertSender2.tsx
 import { Resend } from 'resend';
+
+// Define the expected return type for the API consumer
+interface EmailResult {
+  success: boolean;
+  error?: string;
+}
 
 interface AnalysisSignal {
   signal: string;
@@ -11,7 +16,7 @@ interface AnalysisSignal {
   rank?: number;
 }
 
-interface AlertSenderProps {
+interface SendAlertEmailProps {
   signals: AnalysisSignal[];
   symbol: string;
   userEmail: string;
@@ -23,16 +28,18 @@ interface AlertSenderProps {
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
- * Server Component that sends email alerts for top AI-ranked signals from weekly analysis
- * Focuses on the top 3 signals by AI score (1-100)
+ * Server utility function that sends email alerts for top AI-ranked signals.
+ *
+ * @param props The alert configuration data.
+ * @returns A promise that resolves to an EmailResult object indicating success or failure.
  */
-export default async function AlertSender({ 
+export default async function sendAlertEmail({ 
   signals, 
   symbol, 
   userEmail, 
   dateRange,
   analysisDate 
-}: AlertSenderProps) {
+}: SendAlertEmailProps): Promise<EmailResult> {
   try {
     // Get top 3 AI-ranked signals
     const topSignals = signals
@@ -42,7 +49,8 @@ export default async function AlertSender({
 
     if (topSignals.length === 0) {
       console.log('⚠️ No AI-scored signals found, skipping email');
-      return null;
+      // Report success, but indicate that no action was taken
+      return { success: true, error: 'No AI-scored signals found to send' };
     }
 
     const emailContent = generateEmailHTML(topSignals, symbol, dateRange, analysisDate);
@@ -54,12 +62,20 @@ export default async function AlertSender({
       html: emailContent,
     });
 
+    if (result.error) {
+       console.error(`❌ Resend API Error for ${userEmail}:`, result.error);
+       return { success: false, error: result.error.message };
+    }
+
     console.log(`✅ Weekly AI-ranked alert sent to ${userEmail} for ${symbol}`, result.data?.id);
     
-    return null;
+    // Correct return for success
+    return { success: true };
+
   } catch (error) {
     console.error('❌ Failed to send AI-ranked alert email:', error);
-    return null;
+    // Correct return for failure
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown email send error' };
   }
 }
 
