@@ -1,8 +1,9 @@
-// app/Dashboard5/page.tsx
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Storage } from "@google-cloud/storage";
-import AlertSender from "../components/AlertSender2";
+// Import the utility function, but rename it back to AlertSender for clarity if desired,
+// but the usage must be a function call, not a JSX component.
+import sendAlertEmail from "../components/AlertSender2";
 
 interface TechnicalDataResponse {
   technicalData: Record<string, unknown> | null;
@@ -34,6 +35,12 @@ interface AnalysisData {
 interface WeeklySignalResult {
   signal: AnalysisSignal;
   date: string;
+}
+
+// Define the type for the email result to track success/failure
+interface EmailResult {
+  success: boolean;
+  error?: string;
 }
 
 export const dynamic = "force-dynamic";
@@ -314,6 +321,30 @@ export default async function DashboardPage({
   weekAgo.setDate(today.getDate() - 7);
   const dateRange = `${weekAgo.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
+  // --- FIX START: Execute the side effect (send email) directly ---
+  let emailResult: EmailResult | undefined;
+  if (weeklyStrongestResult && userEmail) {
+    try {
+      // Direct async call to the utility function
+      emailResult = await sendAlertEmail({ 
+        signals: [weeklyStrongestResult.signal], 
+        symbol: symbol, 
+        userEmail: userEmail,
+        dateRange: dateRange,
+        analysisDate: weeklyStrongestResult.date
+      });
+      if (!emailResult.success) {
+        console.error("Email failed to send on page load:", emailResult.error);
+        // Optionally, you might want to log this failure on the UI state, 
+        // but for a server component, simply tracking the result is fine.
+      }
+    } catch (e) {
+      console.error("Error calling sendAlertEmail utility:", e);
+    }
+  }
+  // --- FIX END ---
+
+
   // Helper components
   function StrengthBadge({ strength }: { strength: string }) {
     const base = "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium";
@@ -419,16 +450,8 @@ export default async function DashboardPage({
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
-      {/* 🚀 Send weekly email alert using server component (no UI rendered) */}
-      {weeklyStrongestResult && userEmail && (
-        <AlertSender 
-          signals={[weeklyStrongestResult.signal]} 
-          symbol={symbol} 
-          userEmail={userEmail}
-          dateRange={dateRange}
-          analysisDate={weeklyStrongestResult.date}
-        />
-      )}
+      {/* 🚀 Send weekly email alert: REMOVED JSX component usage */}
+      {/* The side effect is executed above the return statement. */}
 
       <div className="container mx-auto py-10">
         <header className="mb-6 flex items-center justify-between">
@@ -459,17 +482,20 @@ export default async function DashboardPage({
         </header>
 
         {/* Weekly Email confirmation banner */}
-        {weeklyStrongestResult && userEmail && (
-          <div className="mb-6 p-4 bg-purple-900/30 border border-purple-700 rounded-lg">
+        {/* Updated banner logic to reference the emailResult status */}
+        {emailResult && (
+          <div className={`mb-6 p-4 rounded-lg border ${emailResult.success ? 'bg-purple-900/30 border-purple-700' : 'bg-red-900/30 border-red-700'}`}>
             <div className="flex items-center gap-3">
-              <span className="text-2xl">📧</span>
+              <span className="text-2xl">{emailResult.success ? '📧' : '🚨'}</span>
               <div>
-                <p className="text-purple-400 font-medium">
-                  Weekly Alert Email Sent
+                <p className={`font-medium ${emailResult.success ? 'text-purple-400' : 'text-red-400'}`}>
+                  {emailResult.success ? 'Weekly Alert Email Sent' : 'Failed to Send Weekly Alert'}
                 </p>
                 <p className="text-sm text-gray-300">
-                  The strongest signal from the past week ({weeklyStrongestResult.signal.signal} on {weeklyStrongestResult.date}) was detected. 
-                  An alert has been sent to <span className="font-mono">{userEmail}</span>.
+                  {emailResult.success 
+                    ? `The strongest signal from the past week (${weeklyStrongestResult!.signal.signal} on ${weeklyStrongestResult!.date}) was detected and an alert was sent to ${userEmail}.`
+                    : `An error occurred while trying to send the alert to ${userEmail}. Error: ${emailResult.error}`
+                  }
                 </p>
               </div>
             </div>

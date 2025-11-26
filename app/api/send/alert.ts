@@ -1,6 +1,5 @@
-// app/api/send/alert.ts
 import { NextResponse } from 'next/server';
-import { sendAlertEmail } from '../../components/AlertSender2'
+import sendAlertEmail from '../../components/AlertSender2';
 
 interface EmailResult {
   success: boolean;
@@ -8,6 +7,7 @@ interface EmailResult {
 }
 
 export async function POST(request: Request) {
+  // Parse the request body
   const { symbol, dateRange, analysisDate, signals } = await request.json();
 
   // Get recipients from environment variable
@@ -22,14 +22,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    const results = await Promise.all(
-      alertRecipients.map(async (userEmail): Promise<EmailResult> => {
+    const results: EmailResult[] = await Promise.all(
+      alertRecipients.map(async (userEmail) => {
+        // The imported function now correctly returns EmailResult
         return await sendAlertEmail({ signals, symbol, userEmail, dateRange, analysisDate });
       })
     );
 
     const failures = results.filter(result => !result.success);
     if (failures.length > 0) {
+      console.error(`❌ Found ${failures.length} email failures:`, failures);
       return NextResponse.json(
         { error: 'Some emails failed to send', failures },
         { status: 400 }
