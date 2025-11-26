@@ -22,22 +22,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    const results = await Promise.all(
-      alertRecipients.map(async (userEmail): Promise<EmailResult> => {
-        // Capture the result from the email sender
-        const result = await sendAlertEmail({ signals, symbol, userEmail, dateRange, analysisDate });
-        
-        // FIX: If sendAlertEmail returns null/undefined, return a failure object instead
-        if (!result) {
-          return { success: false, error: 'Email sender returned null' };
-        }
-        
-        return result;
+    const results: EmailResult[] = await Promise.all(
+      alertRecipients.map(async (userEmail) => {
+        // The imported function now correctly returns EmailResult
+        return await sendAlertEmail({ signals, symbol, userEmail, dateRange, analysisDate });
       })
     );
 
     const failures = results.filter(result => !result.success);
     if (failures.length > 0) {
+      console.error(`❌ Found ${failures.length} email failures:`, failures);
       return NextResponse.json(
         { error: 'Some emails failed to send', failures },
         { status: 400 }
