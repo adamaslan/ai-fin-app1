@@ -1,7 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Storage } from "@google-cloud/storage";
-import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ComposedChart } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface TechnicalIndicators {
   Current_Price: number;
@@ -47,10 +47,16 @@ interface GetFilesApiResponse {
   prefixes?: string[];
 }
 
+interface ChartDataPoint {
+  day: number;
+  price: number;
+  sma50: number;
+  sma200: number;
+}
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Validate environment variables
 if (!process.env.GCP_PROJECT_ID) {
   console.error("❌ GCP_PROJECT_ID environment variable is not set");
   throw new Error("GCP_PROJECT_ID is required");
@@ -61,7 +67,6 @@ if (!process.env.GCP_CREDENTIALS) {
   throw new Error("GCP_CREDENTIALS is required");
 }
 
-// Initialize Storage client
 function getGCPCredentials() {
   try {
     const credentials = process.env.GCP_CREDENTIALS 
@@ -85,9 +90,6 @@ function getGCPCredentials() {
 const storageClient = new Storage(getGCPCredentials());
 const BUCKET_NAME = "ttb-bucket1";
 
-/**
- * Get list of all available spread analysis symbols from ALL date folders
- */
 async function getAvailableSymbols(): Promise<string[]> {
   try {
     const [, , apiResponse] = await storageClient
@@ -104,7 +106,6 @@ async function getAvailableSymbols(): Promise<string[]> {
       return [];
     }
 
-    // Search across ALL date folders to find all symbols with spread analysis
     const symbolSet = new Set<string>();
     
     for (const datePrefix of dateFolders) {
@@ -114,8 +115,6 @@ async function getAvailableSymbols(): Promise<string[]> {
       
       files.forEach(file => {
         const fileName = file.name.split('/').pop() || '';
-        
-        // Match spread analysis pattern: SYMBOL_spread_analysis_timestamp.json
         const spreadMatch = fileName.match(/([A-Z]+)_spread_analysis_/);
         if (spreadMatch) {
           symbolSet.add(spreadMatch[1]);
@@ -130,12 +129,7 @@ async function getAvailableSymbols(): Promise<string[]> {
   }
 }
 
-/**
- * Fetches the latest available spread analysis data for a given symbol.
- * Searches across ALL date folders to find the most recent spread analysis.
- */
 async function getLatestSpreadAnalysis(symbol: string): Promise<SpreadAnalysisData | null> {
-  // Get all date folders under /daily/
   const [, , apiResponse] = await storageClient
     .bucket(BUCKET_NAME)
     .getFiles({
@@ -150,10 +144,8 @@ async function getLatestSpreadAnalysis(symbol: string): Promise<SpreadAnalysisDa
     throw new Error("No date folders found in /daily/");
   }
 
-  // Sort date folders in descending order (newest first)
   const sortedDateFolders = dateFolders.sort().reverse();
 
-  // Search through date folders starting with the most recent
   for (const datePrefix of sortedDateFolders) {
     const [files] = await storageClient
       .bucket(BUCKET_NAME)
@@ -168,7 +160,6 @@ async function getLatestSpreadAnalysis(symbol: string): Promise<SpreadAnalysisDa
       .sort((a, b) => a.name.localeCompare(b.name))
       .pop();
 
-    // If we found a spread analysis file for this symbol, use it
     if (spreadFile) {
       try {
         const file = storageClient.bucket(BUCKET_NAME).file(spreadFile.name);
@@ -181,16 +172,12 @@ async function getLatestSpreadAnalysis(symbol: string): Promise<SpreadAnalysisDa
     }
   }
 
-  // If we searched all folders and found nothing
   return null;
 }
 
-/**
- * Generate chart data from indicators
- */
-function generateChartData(indicators: TechnicalIndicators): any[] {
+function generateChartData(indicators: TechnicalIndicators): ChartDataPoint[] {
   const days = 90;
-  const chartData = [];
+  const chartData: ChartDataPoint[] = [];
   let price = indicators.Current_Price * 0.9;
 
   for (let i = 0; i < days; i++) {
@@ -200,12 +187,27 @@ function generateChartData(indicators: TechnicalIndicators): any[] {
       price: parseFloat(price.toFixed(2)),
       sma50: indicators.SMA_50 + (Math.random() - 0.5) * 0.3,
       sma200: indicators.SMA_200 + (Math.random() - 0.5) * 0.5,
-      volume: Math.floor(indicators.Avg_Volume_50 * (0.8 + Math.random() * 0.4)),
-      rsi: 50 + Math.random() * 30 - 15,
     });
   }
 
   return chartData;
+}
+
+function PriceChart({ data }: { data: ChartDataPoint[] }) {
+  return (
+    <ResponsiveContainer width="100%" height={400}>
+      <LineChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
+        <XAxis dataKey="day" stroke="rgba(148, 163, 184, 0.5)" />
+        <YAxis stroke="rgba(148, 163, 184, 0.5)" />
+        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: '0.5rem' }} />
+        <Legend />
+        <Line type="monotone" dataKey="price" stroke="#3b82f6" strokeWidth={2} name="Price" isAnimationActive={false} />
+        <Line type="monotone" dataKey="sma50" stroke="#f59e0b" strokeWidth={2} name="SMA 50" isAnimationActive={false} />
+        <Line type="monotone" dataKey="sma200" stroke="#ec4899" strokeWidth={2} name="SMA 200" isAnimationActive={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
 }
 
 function StrengthBadge({ value, type }: { value: number; type: 'rsi' | 'mfi' | 'stoch' }) {
@@ -293,64 +295,6 @@ function SpreadCard({ spread }: { spread: Spread }) {
   );
 }
 
-function PriceChart({ data }: { data: any[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={400}>
-      <ComposedChart data={data}>
-        <defs>
-          <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.7} />
-            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-        <XAxis dataKey="day" stroke="rgba(148, 163, 184, 0.5)" />
-        <YAxis stroke="rgba(148, 163, 184, 0.5)" />
-        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: '0.5rem' }} />
-        <Legend />
-        <Area type="monotone" dataKey="price" fill="url(#priceGradient)" stroke="#3b82f6" strokeWidth={2} name="Price" />
-        <Line type="monotone" dataKey="sma50" stroke="#f59e0b" strokeWidth={2} name="SMA 50" isAnimationActive={false} />
-        <Line type="monotone" dataKey="sma200" stroke="#ec4899" strokeWidth={2} name="SMA 200" isAnimationActive={false} />
-      </ComposedChart>
-    </ResponsiveContainer>
-  );
-}
-
-function VolumeChart({ data }: { data: any[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={400}>
-      <BarChart data={data}>
-        <defs>
-          <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
-            <stop offset="95%" stopColor="#10b981" stopOpacity={0.2} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-        <XAxis dataKey="day" stroke="rgba(148, 163, 184, 0.5)" />
-        <YAxis stroke="rgba(148, 163, 184, 0.5)" />
-        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: '0.5rem' }} formatter={(value: any) => `${(value / 1000000).toFixed(1)}M`} />
-        <Bar dataKey="volume" fill="url(#volumeGradient)" name="Volume" />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-function RSIChart({ data }: { data: any[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={400}>
-      <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.1)" />
-        <XAxis dataKey="day" stroke="rgba(148, 163, 184, 0.5)" />
-        <YAxis stroke="rgba(148, 163, 184, 0.5)" domain={[0, 100]} />
-        <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: '0.5rem' }} />
-        <Legend />
-        <Line type="monotone" dataKey="rsi" stroke="#8b5cf6" strokeWidth={2} name="RSI" isAnimationActive={false} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
 export default async function DashboardSpreadsPage({
   searchParams,
 }: {
@@ -359,25 +303,12 @@ export default async function DashboardSpreadsPage({
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
-  // Test bucket access
-  console.log("Testing GCS bucket access...");
-  try {
-    const [exists] = await storageClient.bucket(BUCKET_NAME).exists();
-    console.log(`✅ Bucket ${BUCKET_NAME} exists:`, exists);
-  } catch (error) {
-    console.error("❌ Error accessing bucket:", error instanceof Error ? error.message : "Unknown error");
-  }
-
-  // Get available symbols
   const availableSymbols = await getAvailableSymbols();
-  console.log("📊 Available spread analysis symbols:", availableSymbols);
-  
-  // Await searchParams and use symbol from query params or default to first available
   const params = await searchParams;
   const symbol = params.symbol || availableSymbols[0] || "LLY";
 
   let analysisData: SpreadAnalysisData | null = null;
-  let chartData: any[] = [];
+  let chartData: ChartDataPoint[] = [];
   try {
     analysisData = await getLatestSpreadAnalysis(symbol);
     if (analysisData) {
@@ -476,7 +407,6 @@ export default async function DashboardSpreadsPage({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Trend Indicators */}
               <div className="p-4 bg-gray-800 rounded-lg">
                 <h4 className="text-sm font-semibold text-gray-300 mb-3">Trend Indicators</h4>
                 <div className="space-y-2">
@@ -495,7 +425,6 @@ export default async function DashboardSpreadsPage({
                 </div>
               </div>
 
-              {/* Momentum Indicators */}
               <div className="p-4 bg-gray-800 rounded-lg">
                 <h4 className="text-sm font-semibold text-gray-300 mb-3">Momentum</h4>
                 <div className="space-y-2">
@@ -523,7 +452,6 @@ export default async function DashboardSpreadsPage({
                 </div>
               </div>
 
-              {/* Volatility Indicators */}
               <div className="p-4 bg-gray-800 rounded-lg">
                 <h4 className="text-sm font-semibold text-gray-300 mb-3">Volatility</h4>
                 <div className="space-y-2">
@@ -542,7 +470,6 @@ export default async function DashboardSpreadsPage({
                 </div>
               </div>
 
-              {/* Volume & Price Action */}
               <div className="p-4 bg-gray-800 rounded-lg">
                 <h4 className="text-sm font-semibold text-gray-300 mb-3">Volume & Price</h4>
                 <div className="space-y-2">
@@ -564,27 +491,16 @@ export default async function DashboardSpreadsPage({
           </div>
         </section>
 
-        {/* Charts Section */}
+        {/* Price Chart */}
         <section className="mb-8">
-          <h3 className="text-xl font-semibold mb-4">Technical Analysis Charts</h3>
-          <div className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg mb-6">
-            <h4 className="text-lg font-semibold text-white mb-4">90-Day Price Action & Moving Averages</h4>
+          <div className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
+            <h3 className="text-xl font-semibold mb-4">90-Day Price Action & Moving Averages</h3>
             <PriceChart data={chartData} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
-              <h4 className="text-lg font-semibold text-white mb-4">Trading Volume</h4>
-              <VolumeChart data={chartData} />
-            </div>
-            <div className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
-              <h4 className="text-lg font-semibold text-white mb-4">RSI Momentum</h4>
-              <RSIChart data={chartData} />
-            </div>
           </div>
         </section>
 
         {/* Options Spreads Analysis */}
-        <section className="mb-8">
+        <section>
           <h3 className="text-xl font-semibold mb-4">AI-Enhanced Options Spread Analysis</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {analysisData.spreads.map((spread, index) => (
