@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",
-    "@clerk/nextjs": "^6.33.3",
+    "@clerk/nextjs": "^6.36.0",
     "@google-cloud/storage": "^7.17.2",
     "@prisma/adapter-neon": "^6.10.1",
     "@prisma/client": "^6.16.2",
