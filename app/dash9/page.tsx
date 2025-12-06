@@ -3,8 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Storage } from "@google-cloud/storage";
 import fs from "fs";
-import DashboardClient from "./DashboardClient"; // Import the client component
-
+import DashboardClient from "../components/DashboardClient"
 interface TechnicalDataResponse {
   technicalData: Record<string, unknown> | null;
   geminiAnalysis: Record<string, unknown> | null;
