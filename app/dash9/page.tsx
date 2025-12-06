@@ -244,7 +244,7 @@ export default async function DashboardPage({
   // ============================================
   return (
     <DashboardClient
-      user={{ firstName: user.firstName || "User" }}
+      user={{ firstName: user?.firstName || "User" }}
       availableSymbols={availableSymbols}
       selectedSymbol={symbol}
       analysisData={analysisData}
