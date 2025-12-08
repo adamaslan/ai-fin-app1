@@ -35,6 +35,7 @@ interface DashboardProps {
   selectedSymbol: string;
   optionsAnalysisData: OptionsAnalysisData | null;
   technicalData: any;
+  historicalPriceData: any[] | null;
   bucketName: string;
 }
 
@@ -181,6 +182,7 @@ export default function OptionsAnalysisDashboard({
   selectedSymbol,
   optionsAnalysisData,
   technicalData,
+  historicalPriceData,
   bucketName,
 }: DashboardProps) {
   if (!optionsAnalysisData) {
