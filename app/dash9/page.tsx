@@ -247,9 +247,10 @@ export default async function DashboardPage({
       user={{ firstName: user?.firstName || "User" }}
       availableSymbols={availableSymbols}
       selectedSymbol={symbol}
-      analysisData={analysisData}
       technicalData={technicalData}
       bucketName={BUCKET_NAME}
+      optionsAnalysisData={null}
+      historicalPriceData={null}
     />
   );
 }
