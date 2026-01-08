@@ -535,7 +535,7 @@ export default async function DashboardPage({
           <section className="bg-gradient-to-br from-gray-800 to-gray-700 p-6 rounded-xl shadow-lg">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-2xl font-semibold">{analysisData.symbol ?? symbol} — Today&apos;s Analysis</h2>
+                <h2 className="text-2xl font-semibold">{analysisData.symbol ?? symbol} — Today&apos;s Dope Analysis</h2>
                 <p className="text-sm text-gray-300 mt-1">Signal count: {analysisData.signal_count}</p>
               </div>
               <div className="text-right">
